@@ -175,7 +175,7 @@ public struct Configuration: Sendable, Hashable, ConfigurationBuilder {
             )
             async let (
                 standardOutput,
-                standardError,
+                standardError
             ) = try await execution.captureIOs()
             // Write input in the same scope
             guard let writeFd = inputPipe.writeFileDescriptor else {
