@@ -9,21 +9,19 @@
 //
 //===----------------------------------------------------------------------===//
 
-
-#if canImport(Darwin)
-import Darwin
-#elseif canImport(Bionic)
-import Bionic
-#elseif canImport(Glibc)
-import Glibc
-#elseif canImport(Musl)
-import Musl
-#elseif canImport(WinSDK)
-import WinSDK
-#endif
-
 import _SubprocessCShims
 
+#if canImport(Darwin)
+    import Darwin
+#elseif canImport(Bionic)
+    import Bionic
+#elseif canImport(Glibc)
+    import Glibc
+#elseif canImport(Musl)
+    import Musl
+#elseif canImport(WinSDK)
+    import WinSDK
+#endif
 
 /// A step in the graceful shutdown teardown sequence.
 /// It consists of an action to perform on the child process and the
@@ -31,33 +29,33 @@ import _SubprocessCShims
 /// to the next step.
 public struct TeardownStep: Sendable, Hashable {
     internal enum Storage: Sendable, Hashable {
-#if !os(Windows)
-        case sendSignal(Signal, allowedDuration: Duration)
-#endif
+        #if !os(Windows)
+            case sendSignal(Signal, allowedDuration: Duration)
+        #endif
         case gracefulShutDown(allowedDuration: Duration)
         case kill
     }
     var storage: Storage
 
-#if !os(Windows)
-    /// Sends `signal` to the process and allows `allowedDurationToExit`
-    /// for the process to exit before proceeding to the next step.
-    /// The final step in the sequence will always send a `.kill` signal.
-    public static func send(
-        signal: Signal,
-        allowedDurationToNextStep: Duration
-    ) -> Self {
-        return Self(
-            storage: .sendSignal(
-                signal,
-                allowedDuration: allowedDurationToNextStep
+    #if !os(Windows)
+        /// Sends `signal` to the process and allows `allowedDurationToExit`
+        /// for the process to exit before proceeding to the next step.
+        /// The final step in the sequence will always send a `.kill` signal.
+        public static func send(
+            signal: Signal,
+            allowedDurationToNextStep: Duration
+        ) -> Self {
+            return Self(
+                storage: .sendSignal(
+                    signal,
+                    allowedDuration: allowedDurationToNextStep
+                )
             )
-        )
-    }
-#endif // !os(Windows)
+        }
+    #endif  // !os(Windows)
 
     /// Attempt to perform a graceful shutdown and allows
-    /// `alloweDurationToNextStep` for the process to exit
+    /// `allowedDurationToNextStep` for the process to exit
     /// before proceeding to the next step:
     /// - On Unix: send `SIGTERM`
     /// - On Windows:
@@ -65,19 +63,18 @@ public struct TeardownStep: Sendable, Hashable {
     ///   2. Attempt to send `CTRL_C_EVENT` to console;
     ///   3. Attempt to send `CTRL_BREAK_EVENT` to process group.
     public static func gracefulShutDown(
-        alloweDurationToNextStep: Duration
+        allowedDurationToNextStep: Duration
     ) -> Self {
         return Self(
             storage: .gracefulShutDown(
-                allowedDuration: alloweDurationToNextStep
+                allowedDuration: allowedDurationToNextStep
             )
         )
     }
 }
 
-
 #if SubprocessSpan
-@available(SubprocessSpan, *)
+    @available(SubprocessSpan, *)
 #endif
 extension Execution {
     /// Performs a sequence of teardown steps on the Subprocess.
@@ -97,56 +94,58 @@ internal enum TeardownStepCompletion {
 }
 
 #if SubprocessSpan
-@available(SubprocessSpan, *)
+    @available(SubprocessSpan, *)
 #endif
 extension Execution {
     internal func gracefulShutDown(
-        alloweDurationToNextStep duration: Duration
+        allowedDurationToNextStep duration: Duration
     ) async {
-#if os(Windows)
-        guard let processHandle = OpenProcess(
-            DWORD(PROCESS_QUERY_INFORMATION | SYNCHRONIZE),
-            false,
-            self.processIdentifier.value
-        ) else {
-            // Nothing more we can do
-            return
-        }
-        defer {
-            CloseHandle(processHandle)
-        }
-
-        // 1. Attempt to send WM_CLOSE to the main window
-        if _subprocess_windows_send_vm_close(
-            self.processIdentifier.value
-        ) {
-            try? await Task.sleep(for: duration)
-        }
-
-        // 2. Attempt to attach to the console and send CTRL_C_EVENT
-        if AttachConsole(self.processIdentifier.value) {
-            // Disable Ctrl-C handling in this process
-            if SetConsoleCtrlHandler(nil, true) {
-                if GenerateConsoleCtrlEvent(DWORD(CTRL_C_EVENT), 0) {
-                    // We successfully sent the event. wait for the process to exit
-                    try? await Task.sleep(for: duration)
-                }
-                // Re-enable Ctrl-C handling
-                SetConsoleCtrlHandler(nil, false);
+        #if os(Windows)
+            guard
+                let processHandle = OpenProcess(
+                    DWORD(PROCESS_QUERY_INFORMATION | SYNCHRONIZE),
+                    false,
+                    self.processIdentifier.value
+                )
+            else {
+                // Nothing more we can do
+                return
             }
-            // Detach console
-            FreeConsole()
-        }
+            defer {
+                CloseHandle(processHandle)
+            }
 
-        // 3. Attempt to send CTRL_BREAK_EVENT to the process group
-        if GenerateConsoleCtrlEvent(DWORD(CTRL_BREAK_EVENT), self.processIdentifier.value) {
-            // Wait for process to exit
-            try? await Task.sleep(for: duration)
-        }
-#else
-        // Send SIGTERM
-        try? self.send(signal: .terminate)
-#endif
+            // 1. Attempt to send WM_CLOSE to the main window
+            if _subprocess_windows_send_vm_close(
+                self.processIdentifier.value
+            ) {
+                try? await Task.sleep(for: duration)
+            }
+
+            // 2. Attempt to attach to the console and send CTRL_C_EVENT
+            if AttachConsole(self.processIdentifier.value) {
+                // Disable Ctrl-C handling in this process
+                if SetConsoleCtrlHandler(nil, true) {
+                    if GenerateConsoleCtrlEvent(DWORD(CTRL_C_EVENT), 0) {
+                        // We successfully sent the event. wait for the process to exit
+                        try? await Task.sleep(for: duration)
+                    }
+                    // Re-enable Ctrl-C handling
+                    SetConsoleCtrlHandler(nil, false)
+                }
+                // Detach console
+                FreeConsole()
+            }
+
+            // 3. Attempt to send CTRL_BREAK_EVENT to the process group
+            if GenerateConsoleCtrlEvent(DWORD(CTRL_BREAK_EVENT), self.processIdentifier.value) {
+                // Wait for process to exit
+                try? await Task.sleep(for: duration)
+            }
+        #else
+            // Send SIGTERM
+            try? self.send(signal: .terminate)
+        #endif
     }
 
     internal func runTeardownSequence(_ sequence: some Sequence<TeardownStep> & Sendable) async {
@@ -168,32 +167,32 @@ extension Execution {
                             return .processHasExited
                         }
                     }
-                    await self.gracefulShutDown(alloweDurationToNextStep: allowedDuration)
+                    await self.gracefulShutDown(allowedDurationToNextStep: allowedDuration)
                     return await group.next()!
                 }
-#if !os(Windows)
-            case .sendSignal(let signal, let allowedDuration):
-                stepCompletion = await withTaskGroup(of: TeardownStepCompletion.self) { group in
-                    group.addTask {
-                        do {
-                            try await Task.sleep(for: allowedDuration)
-                            return .processStillAlive
-                        } catch {
-                            // teardown(using:) cancells this task
-                            // when process has exited
-                            return .processHasExited
+            #if !os(Windows)
+                case .sendSignal(let signal, let allowedDuration):
+                    stepCompletion = await withTaskGroup(of: TeardownStepCompletion.self) { group in
+                        group.addTask {
+                            do {
+                                try await Task.sleep(for: allowedDuration)
+                                return .processStillAlive
+                            } catch {
+                                // teardown(using:) cancells this task
+                                // when process has exited
+                                return .processHasExited
+                            }
                         }
+                        try? self.send(signal: signal)
+                        return await group.next()!
                     }
-                    try? self.send(signal: signal)
-                    return await group.next()!
-                }
-#endif // !os(Windows)
+            #endif  // !os(Windows)
             case .kill:
-#if os(Windows)
-                try? self.terminate(withExitCode: 0)
-#else
-                try? self.send(signal: .kill)
-#endif
+                #if os(Windows)
+                    try? self.terminate(withExitCode: 0)
+                #else
+                    try? self.send(signal: .kill)
+                #endif
                 stepCompletion = .killedTheProcess
             }
 
