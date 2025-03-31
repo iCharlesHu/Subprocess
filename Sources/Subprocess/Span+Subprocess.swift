@@ -28,7 +28,7 @@ public func _overrideLifetime<
 
 @_unsafeNonescapableResult
 @inlinable @inline(__always)
-@lifetime(source)
+@lifetime(copy source)
 public func _overrideLifetime<
     T: ~Copyable & ~Escapable,
     U: ~Copyable & ~Escapable
