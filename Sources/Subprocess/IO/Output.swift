@@ -29,10 +29,10 @@ internal import Dispatch
 public protocol OutputProtocol: Sendable {
     associatedtype OutputType: Sendable
 
-#if SubprocessSpan
+    #if SubprocessSpan
     /// Convert the output from span to expected output type
     func output(from span: RawSpan) throws -> OutputType
-#endif
+    #endif
 
     /// Convert the output from buffer to expected output type
     func output(from buffer: some Sequence<UInt8>) throws -> OutputType
@@ -62,7 +62,7 @@ public struct DiscardedOutput: OutputProtocol {
     public typealias OutputType = Void
 
     internal func createPipe() throws -> CreatedPipe {
-#if os(Windows)
+        #if os(Windows)
         // On Windows, instead of binding to dev null,
         // we don't set the input handle in the `STARTUPINFOW`
         // to signal no output
@@ -70,16 +70,16 @@ public struct DiscardedOutput: OutputProtocol {
             readFileDescriptor: nil,
             writeFileDescriptor: nil
         )
-#else
+        #else
         let devnull: FileDescriptor = try .openDevNull(withAcessMode: .readOnly)
         return CreatedPipe(
             readFileDescriptor: .init(devnull, closeWhenDone: true),
             writeFileDescriptor: nil
         )
-#endif
+        #endif
     }
 
-    internal init() { }
+    internal init() {}
 }
 
 /// A concrete `Output` type for subprocesses that
@@ -127,22 +127,22 @@ public struct StringOutput<Encoding: Unicode.Encoding>: OutputProtocol {
     public let maxSize: Int
     private let encoding: Encoding.Type
 
-#if SubprocessSpan
+    #if SubprocessSpan
     public func output(from span: RawSpan) throws -> String? {
         // FIXME: Span to String
         var array: [UInt8] = []
-        for index in 0 ..< span.byteCount {
+        for index in 0..<span.byteCount {
             array.append(span.unsafeLoad(fromByteOffset: index, as: UInt8.self))
         }
         return String(decodingBytes: array, as: self.encoding)
     }
-#else
+    #else
     public func output(from buffer: some Sequence<UInt8>) throws -> String? {
         // FIXME: Span to String
         let array = Array(buffer)
         return String(decodingBytes: array, as: Encoding.self)
     }
-#endif
+    #endif
 
     internal init(limit: Int, encoding: Encoding.Type) {
         self.maxSize = limit
@@ -170,11 +170,11 @@ public struct BytesOutput: OutputProtocol {
                 switch result {
                 case .success(let data):
                     //FIXME: remove workaround for rdar://143992296
-                #if os(Windows)
+                    #if os(Windows)
                     continuation.resume(returning: data)
-                #else
+                    #else
                     continuation.resume(returning: data.array())
-                #endif
+                    #endif
                 case .failure(let error):
                     continuation.resume(throwing: error)
                 }
@@ -182,15 +182,15 @@ public struct BytesOutput: OutputProtocol {
         }
     }
 
-#if SubprocessSpan
+    #if SubprocessSpan
     public func output(from span: RawSpan) throws -> [UInt8] {
         fatalError("Not implemented")
     }
-#else
+    #else
     public func output(from buffer: some Sequence<UInt8>) throws -> [UInt8] {
         fatalError("Not implemented")
     }
-#endif
+    #endif
 
     internal init(limit: Int) {
         self.maxSize = limit
@@ -207,7 +207,7 @@ public struct BytesOutput: OutputProtocol {
 public struct SequenceOutput: OutputProtocol {
     public typealias OutputType = Void
 
-    internal init() { }
+    internal init() {}
 }
 
 #if SubprocessSpan
@@ -352,14 +352,18 @@ extension OutputProtocol {
 @available(SubprocessSpan, *)
 #endif
 extension OutputProtocol where OutputType == Void {
-    internal func captureOutput(from fileDescriptor: TrackedFileDescriptor?) async throws -> Void { }
+    internal func captureOutput(from fileDescriptor: TrackedFileDescriptor?) async throws {}
 
-#if SubprocessSpan
+    #if SubprocessSpan
     /// Convert the output from Data to expected output type
-    public func output(from span: RawSpan) throws -> Void { /* noop */ }
-#else
-    public func output(from buffer: some Sequence<UInt8>) throws -> Void { /* noop */ }
-#endif // SubprocessSpan
+    public func output(from span: RawSpan) throws {
+        // noop
+    }
+    #else
+    public func output(from buffer: some Sequence<UInt8>) throws {
+        // noop
+    }
+    #endif  // SubprocessSpan
 }
 
 #if SubprocessSpan
@@ -395,4 +399,3 @@ extension DispatchData {
         return result ?? []
     }
 }
-

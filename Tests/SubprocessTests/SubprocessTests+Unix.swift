@@ -25,7 +25,6 @@ import Bionic
 import Musl
 #endif
 
-
 import _SubprocessCShims
 import Testing
 @testable import Subprocess
@@ -40,13 +39,13 @@ import System
 #endif
 
 @Suite(.serialized)
-struct SubprocessUnixTests { }
+struct SubprocessUnixTests {}
 
 // MARK: - Executable test
 extension SubprocessUnixTests {
 
     @Test func testExecutableNamed() async throws {
-        guard #available(SubprocessSpan, *) else {
+        guard #available(SubprocessSpan , *) else {
             return
         }
         // Simple test to make sure we can find a common utility
@@ -62,9 +61,8 @@ extension SubprocessUnixTests {
         #expect(output == message)
     }
 
-
     @Test func testExecutableNamedCannotResolve() async {
-        guard #available(SubprocessSpan, *) else {
+        guard #available(SubprocessSpan , *) else {
             return
         }
         do {
@@ -80,7 +78,7 @@ extension SubprocessUnixTests {
     }
 
     @Test func testExecutableAtPath() async throws {
-        guard #available(SubprocessSpan, *) else {
+        guard #available(SubprocessSpan , *) else {
             return
         }
         let expected = FileManager.default.currentDirectoryPath
@@ -94,7 +92,7 @@ extension SubprocessUnixTests {
     }
 
     @Test func testExecutableAtPathCannotResolve() async {
-        guard #available(SubprocessSpan, *) else {
+        guard #available(SubprocessSpan , *) else {
             return
         }
         do {
@@ -116,7 +114,7 @@ extension SubprocessUnixTests {
 // MARK: - Arguments Tests
 extension SubprocessUnixTests {
     @Test func testArgunementsArrayLitereal() async throws {
-        guard #available(SubprocessSpan, *) else {
+        guard #available(SubprocessSpan , *) else {
             return
         }
         let result = try await Subprocess.run(
@@ -129,13 +127,12 @@ extension SubprocessUnixTests {
         let output = result.standardOutput?
             .trimmingCharacters(in: .whitespacesAndNewlines)
         #expect(
-            output ==
-            "Hello World!"
+            output == "Hello World!"
         )
     }
 
     @Test func testArgumentsOverride() async throws {
-        guard #available(SubprocessSpan, *) else {
+        guard #available(SubprocessSpan , *) else {
             return
         }
         let result = try await Subprocess.run(
@@ -151,13 +148,12 @@ extension SubprocessUnixTests {
         let output = result.standardOutput?
             .trimmingCharacters(in: .whitespacesAndNewlines)
         #expect(
-            output ==
-            "apple"
+            output == "apple"
         )
     }
 
     @Test func testArgumemtsFromArray() async throws {
-        guard #available(SubprocessSpan, *) else {
+        guard #available(SubprocessSpan , *) else {
             return
         }
         let arguments: [UInt8] = Array("Data Content\0".utf8)
@@ -174,8 +170,7 @@ extension SubprocessUnixTests {
         let output = result.standardOutput?
             .trimmingCharacters(in: .whitespacesAndNewlines)
         #expect(
-            output ==
-            "Data Content"
+            output == "Data Content"
         )
     }
 }
@@ -183,7 +178,7 @@ extension SubprocessUnixTests {
 // MARK: - Environment Tests
 extension SubprocessUnixTests {
     @Test func testEnvironmentInherit() async throws {
-        guard #available(SubprocessSpan, *) else {
+        guard #available(SubprocessSpan , *) else {
             return
         }
         let result = try await Subprocess.run(
@@ -202,7 +197,7 @@ extension SubprocessUnixTests {
     }
 
     @Test func testEnvironmentInheritOverride() async throws {
-        guard #available(SubprocessSpan, *) else {
+        guard #available(SubprocessSpan , *) else {
             return
         }
         let result = try await Subprocess.run(
@@ -218,19 +213,18 @@ extension SubprocessUnixTests {
         let output = result.standardOutput?
             .trimmingCharacters(in: .whitespacesAndNewlines)
         #expect(
-            output ==
-            "/my/new/home"
+            output == "/my/new/home"
         )
     }
 
     @Test func testEnvironmentCustom() async throws {
-        guard #available(SubprocessSpan, *) else {
+        guard #available(SubprocessSpan , *) else {
             return
         }
         let result = try await Subprocess.run(
             .path("/usr/bin/printenv"),
             environment: .custom([
-                "PATH": "/bin:/usr/bin",
+                "PATH": "/bin:/usr/bin"
             ]),
             output: .string
         )
@@ -241,8 +235,7 @@ extension SubprocessUnixTests {
         let output = result.standardOutput?
             .trimmingCharacters(in: .whitespacesAndNewlines)
         #expect(
-            output ==
-            "PATH=/bin:/usr/bin"
+            output == "PATH=/bin:/usr/bin"
         )
     }
 }
@@ -250,7 +243,7 @@ extension SubprocessUnixTests {
 // MARK: - Working Directory Tests
 extension SubprocessUnixTests {
     @Test func testWorkingDirectoryDefaultValue() async throws {
-        guard #available(SubprocessSpan, *) else {
+        guard #available(SubprocessSpan , *) else {
             return
         }
         // By default we should use the working directory of the parent process
@@ -271,7 +264,7 @@ extension SubprocessUnixTests {
     }
 
     @Test func testWorkingDirectoryCustomValue() async throws {
-        guard #available(SubprocessSpan, *) else {
+        guard #available(SubprocessSpan , *) else {
             return
         }
         let workingDirectory = FilePath(
@@ -287,29 +280,27 @@ extension SubprocessUnixTests {
         // `PATH` that we set
         let resultPath = result.standardOutput!
             .trimmingCharacters(in: .whitespacesAndNewlines)
-#if canImport(Darwin)
+        #if canImport(Darwin)
         // On Darwin, /var is linked to /private/var; /tmp is linked to /private/tmp
         var expected = workingDirectory
         if expected.starts(with: "/var") || expected.starts(with: "/tmp") {
             expected = FilePath("/private").appending(expected.components)
         }
         #expect(
-            FilePath(resultPath) ==
-            expected
+            FilePath(resultPath) == expected
         )
-#else
+        #else
         #expect(
-            FilePath(resultPath) ==
-            workingDirectory
+            FilePath(resultPath) == workingDirectory
         )
-#endif
+        #endif
     }
 }
 
 // MARK: - Input Tests
 extension SubprocessUnixTests {
     @Test func testInputNoInput() async throws {
-        guard #available(SubprocessSpan, *) else {
+        guard #available(SubprocessSpan , *) else {
             return
         }
         let catResult = try await Subprocess.run(
@@ -323,7 +314,7 @@ extension SubprocessUnixTests {
     }
 
     @Test func testStringInput() async throws {
-        guard #available(SubprocessSpan, *) else {
+        guard #available(SubprocessSpan , *) else {
             return
         }
         let content = randomString(length: 64)
@@ -337,7 +328,7 @@ extension SubprocessUnixTests {
     }
 
     @Test func testInputFileDescriptor() async throws {
-        guard #available(SubprocessSpan, *) else {
+        guard #available(SubprocessSpan , *) else {
             return
         }
         // Make sure we can read long text from standard input
@@ -345,7 +336,9 @@ extension SubprocessUnixTests {
             contentsOf: URL(filePath: theMysteriousIsland.string)
         )
         let text: FileDescriptor = try .open(
-            theMysteriousIsland, .readOnly)
+            theMysteriousIsland,
+            .readOnly
+        )
         let cat = try await Subprocess.run(
             .name("cat"),
             input: .fileDescriptor(text, closeAfterSpawningProcess: true),
@@ -357,7 +350,7 @@ extension SubprocessUnixTests {
     }
 
     @Test func testInputSequence() async throws {
-        guard #available(SubprocessSpan, *) else {
+        guard #available(SubprocessSpan , *) else {
             return
         }
         // Make sure we can read long text as Sequence
@@ -374,9 +367,9 @@ extension SubprocessUnixTests {
         #expect(Array(catResult.standardOutput) == Array(expected))
     }
 
-#if SubprocessSpan
+    #if SubprocessSpan
     @Test func testInputSpan() async throws {
-        guard #available(SubprocessSpan, *) else {
+        guard #available(SubprocessSpan , *) else {
             return
         }
         let expected: Data = try Data(
@@ -393,10 +386,10 @@ extension SubprocessUnixTests {
         #expect(catResult.standardOutput.count == expected.count)
         #expect(Array(catResult.standardOutput) == Array(expected))
     }
-#endif
+    #endif
 
     @Test func testInputAsyncSequence() async throws {
-        guard #available(SubprocessSpan, *) else {
+        guard #available(SubprocessSpan , *) else {
             return
         }
         // Maeks ure we can read long text as AsyncSequence
@@ -428,7 +421,7 @@ extension SubprocessUnixTests {
     }
 
     @Test func testInputSequenceCustomExecutionBody() async throws {
-        guard #available(SubprocessSpan, *) else {
+        guard #available(SubprocessSpan , *) else {
             return
         }
         let expected: Data = try Data(
@@ -452,7 +445,7 @@ extension SubprocessUnixTests {
     }
 
     @Test func testInputAsyncSequenceCustomExecutionBody() async throws {
-        guard #available(SubprocessSpan, *) else {
+        guard #available(SubprocessSpan , *) else {
             return
         }
         // Maeks ure we can read long text as AsyncSequence
@@ -494,7 +487,7 @@ extension SubprocessUnixTests {
 
 // MARK: - Output Tests
 extension SubprocessUnixTests {
-#if false // This test needs "death test" support
+    #if false  // This test needs "death test" support
     @Test func testOutputDiscarded() async throws {
         let echoResult = try await Subprocess.run(
             .path("/bin/echo"),
@@ -502,12 +495,12 @@ extension SubprocessUnixTests {
             output: .discard
         )
         #expect(echoResult.terminationStatus.isSuccess)
-        _ = echoResult.standardOutput // this line shold fatalError
+        _ = echoResult.standardOutput  // this line shold fatalError
     }
-#endif
+    #endif
 
     @Test func testCollectedOutput() async throws {
-        guard #available(SubprocessSpan, *) else {
+        guard #available(SubprocessSpan , *) else {
             return
         }
         let expected = randomString(length: 32)
@@ -524,7 +517,7 @@ extension SubprocessUnixTests {
     }
 
     @Test func testCollectedOutputWithLimit() async throws {
-        guard #available(SubprocessSpan, *) else {
+        guard #available(SubprocessSpan , *) else {
             return
         }
         let limit = 4
@@ -538,12 +531,12 @@ extension SubprocessUnixTests {
         let output = try #require(
             echoResult.standardOutput
         ).trimmingCharacters(in: .whitespacesAndNewlines)
-        let targetRange = expected.startIndex ..< expected.index(expected.startIndex, offsetBy: limit)
+        let targetRange = expected.startIndex..<expected.index(expected.startIndex, offsetBy: limit)
         #expect(String(expected[targetRange]) == output)
     }
 
     @Test func testCollectedOutputFileDesriptor() async throws {
-        guard #available(SubprocessSpan, *) else {
+        guard #available(SubprocessSpan , *) else {
             return
         }
         let outputFilePath = FilePath(FileManager.default.temporaryDirectory.path())
@@ -579,7 +572,7 @@ extension SubprocessUnixTests {
     }
 
     @Test func testCollectedOutputFileDescriptorAutoClose() async throws {
-        guard #available(SubprocessSpan, *) else {
+        guard #available(SubprocessSpan , *) else {
             return
         }
         let outputFilePath = FilePath(FileManager.default.temporaryDirectory.path())
@@ -616,7 +609,7 @@ extension SubprocessUnixTests {
     }
 
     @Test func testRedirectedOutputRedirectToSequence() async throws {
-        guard #available(SubprocessSpan, *) else {
+        guard #available(SubprocessSpan , *) else {
             return
         }
         // Make ure we can read long text redirected to AsyncSequence
@@ -641,7 +634,7 @@ extension SubprocessUnixTests {
     }
 
     @Test func testBufferOutput() async throws {
-        guard #available(SubprocessSpan, *) else {
+        guard #available(SubprocessSpan , *) else {
             return
         }
         let expected: Data = try Data(
@@ -658,7 +651,7 @@ extension SubprocessUnixTests {
     }
 
     @Test func testCollectedError() async throws {
-        guard #available(SubprocessSpan, *) else {
+        guard #available(SubprocessSpan , *) else {
             return
         }
         // Make ure we can capture long text on standard error
@@ -685,10 +678,10 @@ extension SubprocessUnixTests {
         )
     )
     func testSubprocessPlatformOptionsUserID() async throws {
-        guard #available(SubprocessSpan, *) else {
+        guard #available(SubprocessSpan , *) else {
             return
         }
-        let expectedUserID = uid_t(Int.random(in: 1000 ... 2000))
+        let expectedUserID = uid_t(Int.random(in: 1000...2000))
         var platformOptions = PlatformOptions()
         platformOptions.userID = expectedUserID
         try await self.assertID(
@@ -706,10 +699,10 @@ extension SubprocessUnixTests {
         )
     )
     func testSubprocessPlatformOptionsGroupID() async throws {
-        guard #available(SubprocessSpan, *) else {
+        guard #available(SubprocessSpan , *) else {
             return
         }
-        let expectedGroupID = gid_t(Int.random(in: 1000 ... 2000))
+        let expectedGroupID = gid_t(Int.random(in: 1000...2000))
         var platformOptions = PlatformOptions()
         platformOptions.groupID = expectedGroupID
         try await self.assertID(
@@ -727,12 +720,12 @@ extension SubprocessUnixTests {
         )
     )
     func testSubprocssPlatformOptionsSuplimentaryGroups() async throws {
-        guard #available(SubprocessSpan, *) else {
+        guard #available(SubprocessSpan , *) else {
             return
         }
         var expectedGroups: Set<gid_t> = Set()
-        for _ in 0 ..< Int.random(in: 5 ... 10) {
-            expectedGroups.insert(gid_t(Int.random(in: 1000 ... 2000)))
+        for _ in 0..<Int.random(in: 5...10) {
+            expectedGroups.insert(gid_t(Int.random(in: 1000...2000)))
         }
         var platformOptions = PlatformOptions()
         platformOptions.supplementaryGroups = Array(expectedGroups)
@@ -757,7 +750,7 @@ extension SubprocessUnixTests {
         )
     )
     func testSubprocessPlatformOptionsProcessGroupID() async throws {
-        guard #available(SubprocessSpan, *) else {
+        guard #available(SubprocessSpan , *) else {
             return
         }
         var platformOptions = PlatformOptions()
@@ -781,7 +774,7 @@ extension SubprocessUnixTests {
     }
 
     @Test func testSubprocessPlatformOptionsCreateSession() async throws {
-        guard #available(SubprocessSpan, *) else {
+        guard #available(SubprocessSpan , *) else {
             return
         }
         // platformOptions.createSession implies calls to setsid
@@ -799,7 +792,7 @@ extension SubprocessUnixTests {
     }
 
     @Test func testTeardownSequence() async throws {
-        guard #available(SubprocessSpan, *) else {
+        guard #available(SubprocessSpan , *) else {
             return
         }
         let result = try await Subprocess.run(
@@ -826,7 +819,7 @@ extension SubprocessUnixTests {
                     await subprocess.teardown(using: [
                         .send(signal: .quit, allowedDurationToNextStep: .milliseconds(500)),
                         .send(signal: .terminate, allowedDurationToNextStep: .milliseconds(500)),
-                        .send(signal: .interrupt, allowedDurationToNextStep: .milliseconds(1000))
+                        .send(signal: .interrupt, allowedDurationToNextStep: .milliseconds(1000)),
                     ])
                 }
                 group.addTask {
@@ -836,7 +829,7 @@ extension SubprocessUnixTests {
                             return String(decoding: ptr, as: UTF8.self)
                         }.trimmingCharacters(in: .whitespacesAndNewlines)
                         if bitString.contains("\n") {
-                            outputs.append(contentsOf: bitString.split(separator: "\n").map{ String($0) })
+                            outputs.append(contentsOf: bitString.split(separator: "\n").map { String($0) })
                         } else {
                             outputs.append(bitString)
                         }
@@ -853,7 +846,7 @@ extension SubprocessUnixTests {
 // MARK: - Misc
 extension SubprocessUnixTests {
     @Test func testRunDetached() async throws {
-        guard #available(SubprocessSpan, *) else {
+        guard #available(SubprocessSpan , *) else {
             return
         }
         let (readFd, writeFd) = try FileDescriptor.pipe()
@@ -875,7 +868,7 @@ extension SubprocessUnixTests {
     }
 
     @Test func testTerminateProcess() async throws {
-        guard #available(SubprocessSpan, *) else {
+        guard #available(SubprocessSpan , *) else {
             return
         }
         let stuckResult = try await Subprocess.run(
@@ -914,8 +907,7 @@ extension SubprocessUnixTests {
         #expect(idResult.terminationStatus.isSuccess)
         let id = try #require(idResult.standardOutput)
         #expect(
-            id.trimmingCharacters(in: .whitespacesAndNewlines) ==
-            "\(expected)"
+            id.trimmingCharacters(in: .whitespacesAndNewlines) == "\(expected)"
         )
     }
 }
@@ -986,7 +978,7 @@ extension FileDescriptor {
 // MARK: - Performance Tests
 extension SubprocessUnixTests {
     @Test func testConcurrentRun() async throws {
-        guard #available(SubprocessSpan, *) else {
+        guard #available(SubprocessSpan , *) else {
             return
         }
         // Launch as many processes as we can
@@ -996,10 +988,12 @@ extension SubprocessUnixTests {
             arguments: ["-c", "ulimit -n"],
             output: .string
         )
-        guard let limitString = limitResult
-            .standardOutput?
-            .trimmingCharacters(in: .whitespacesAndNewlines),
-              let limit = Int(limitString) else {
+        guard
+            let limitString = limitResult
+                .standardOutput?
+                .trimmingCharacters(in: .whitespacesAndNewlines),
+            let limit = Int(limitString)
+        else {
             Issue.record("Failed to run  ulimit -n")
             return
         }
@@ -1010,11 +1004,13 @@ extension SubprocessUnixTests {
         try await withThrowingTaskGroup(of: Void.self) { group in
             var running = 0
             let byteCount = 1000
-            for _ in 0 ..< maxConcurrent {
+            for _ in 0..<maxConcurrent {
                 group.addTask {
                     let r = try await Subprocess.run(
                         .path("/bin/bash"),
-                        arguments: ["-sc", #"echo "$1" && echo "$1" >&2"#, "--", String(repeating: "X", count: byteCount)],
+                        arguments: [
+                            "-sc", #"echo "$1" && echo "$1" >&2"#, "--", String(repeating: "X", count: byteCount),
+                        ],
                         output: .data,
                         error: .data
                     )
@@ -1035,16 +1031,18 @@ extension SubprocessUnixTests {
     }
 
     @Test func testCaptureLongStandardOutputAndError() async throws {
-        guard #available(SubprocessSpan, *) else {
+        guard #available(SubprocessSpan , *) else {
             return
         }
         try await withThrowingTaskGroup(of: Void.self) { group in
             var running = 0
-            for _ in 0 ..< 10 {
+            for _ in 0..<10 {
                 group.addTask {
                     let r = try await Subprocess.run(
                         .path("/bin/bash"),
-                        arguments: ["-sc", #"echo "$1" && echo "$1" >&2"#, "--", String(repeating: "X", count: 100_000)],
+                        arguments: [
+                            "-sc", #"echo "$1" && echo "$1" >&2"#, "--", String(repeating: "X", count: 100_000),
+                        ],
                         output: .data,
                         error: .data
                     )
@@ -1062,5 +1060,4 @@ extension SubprocessUnixTests {
     }
 }
 
-#endif // canImport(Darwin) || canImport(Glibc)
-
+#endif  // canImport(Darwin) || canImport(Glibc)

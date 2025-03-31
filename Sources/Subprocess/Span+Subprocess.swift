@@ -9,6 +9,8 @@
 //
 //===----------------------------------------------------------------------===//
 
+// swift-format-ignore-file
+
 #if SubprocessSpan
 
 @_unsafeNonescapableResult
@@ -40,7 +42,6 @@ public func _overrideLifetime<
 #if canImport(Glibc) || canImport(Bionic) || canImport(Musl)
 internal import Dispatch
 
-
 @available(SubprocessSpan, *)
 extension DispatchData {
     var bytes: RawSpan {
@@ -60,6 +61,6 @@ extension DispatchData {
         }
     }
 }
-#endif // canImport(Glibc) || canImport(Bionic) || canImport(Musl)
+#endif  // canImport(Glibc) || canImport(Bionic) || canImport(Musl)
 
-#endif // SubprocessSpan
+#endif  // SubprocessSpan

@@ -47,7 +47,7 @@ public struct Execution<
     internal var outputPipe: CreatedPipe
     internal var errorPipe: CreatedPipe
     internal let outputConsumptionState: LockedState<OutputConsumptionState>
-#if os(Windows)
+    #if os(Windows)
     internal let consoleBehavior: PlatformOptions.ConsoleBehavior
 
     init(
@@ -66,7 +66,7 @@ public struct Execution<
         self.outputConsumptionState = .init(.init(rawValue: 0))
         self.consoleBehavior = consoleBehavior
     }
-#else
+    #else
     init(
         processIdentifier: ProcessIdentifier,
         output: Output,
@@ -81,7 +81,7 @@ public struct Execution<
         self.errorPipe = errorPipe
         self.outputConsumptionState = .init(.init(rawValue: 0))
     }
-#endif // os(Windows)
+    #endif  // os(Windows)
 }
 
 #if SubprocessSpan
@@ -101,7 +101,8 @@ extension Execution where Output == SequenceOutput {
         }
 
         guard consumptionState.contains(.standardOutputConsumed),
-              let fd = self.outputPipe.readFileDescriptor else {
+            let fd = self.outputPipe.readFileDescriptor
+        else {
             fatalError("The standard output has already been consumed")
         }
         return AsyncBufferSequence(fileDescriptor: fd)
@@ -125,7 +126,8 @@ extension Execution where Error == SequenceOutput {
         }
 
         guard consumptionState.contains(.standardErrorConsumed),
-              let fd = self.errorPipe.readFileDescriptor else {
+            let fd = self.errorPipe.readFileDescriptor
+        else {
             fatalError("The standard output has already been consumed")
         }
         return AsyncBufferSequence(fileDescriptor: fd)
@@ -148,11 +150,12 @@ internal struct OutputConsumptionState: OptionSet {
     }
 
     static let standardOutputConsumed: Self = .init(rawValue: 0b0001)
-    static let standardErrorConsumed: Self  = .init(rawValue: 0b0010)
+    static let standardErrorConsumed: Self = .init(rawValue: 0b0010)
 }
 
 internal typealias CapturedIOs<
-    Output: Sendable, Error: Sendable
+    Output: Sendable,
+    Error: Sendable
 > = (standardOutput: Output, standardError: Error)
 
 #if SubprocessSpan
@@ -195,4 +198,3 @@ extension Execution {
         }
     }
 }
-

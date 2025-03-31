@@ -80,62 +80,62 @@ extension CollectedResult: Codable where Output.OutputType: Codable, Error.Outpu
 #if SubprocessSpan
 @available(SubprocessSpan, *)
 #endif
-extension CollectedResult: CustomStringConvertible where Output.OutputType: CustomStringConvertible, Error.OutputType: CustomStringConvertible {
+extension CollectedResult: CustomStringConvertible
+where Output.OutputType: CustomStringConvertible, Error.OutputType: CustomStringConvertible {
     public var description: String {
         return """
-CollectedResult(
-    processIdentifier: \(self.processIdentifier),
-    terminationStatus: \(self.terminationStatus.description),
-    standardOutput: \(self.standardOutput.description)
-    standardError: \(self.standardError.description)
-)
-"""
+            CollectedResult(
+                processIdentifier: \(self.processIdentifier),
+                terminationStatus: \(self.terminationStatus.description),
+                standardOutput: \(self.standardOutput.description)
+                standardError: \(self.standardError.description)
+            )
+            """
     }
 }
 
 #if SubprocessSpan
 @available(SubprocessSpan, *)
 #endif
-extension CollectedResult: CustomDebugStringConvertible where Output.OutputType: CustomDebugStringConvertible, Error.OutputType: CustomDebugStringConvertible {
+extension CollectedResult: CustomDebugStringConvertible
+where Output.OutputType: CustomDebugStringConvertible, Error.OutputType: CustomDebugStringConvertible {
     public var debugDescription: String {
         return """
-CollectedResult(
-    processIdentifier: \(self.processIdentifier),
-    terminationStatus: \(self.terminationStatus.description),
-    standardOutput: \(self.standardOutput.debugDescription)
-    standardError: \(self.standardError.debugDescription)
-)
-"""
+            CollectedResult(
+                processIdentifier: \(self.processIdentifier),
+                terminationStatus: \(self.terminationStatus.description),
+                standardOutput: \(self.standardOutput.debugDescription)
+                standardError: \(self.standardError.debugDescription)
+            )
+            """
     }
 }
-
 
 // MARK: - ExecutionResult Conformances
-extension ExecutionResult: Equatable where Result : Equatable {}
+extension ExecutionResult: Equatable where Result: Equatable {}
 
-extension ExecutionResult: Hashable where Result : Hashable {}
+extension ExecutionResult: Hashable where Result: Hashable {}
 
-extension ExecutionResult: Codable where Result : Codable {}
+extension ExecutionResult: Codable where Result: Codable {}
 
-extension ExecutionResult: CustomStringConvertible where Result : CustomStringConvertible {
+extension ExecutionResult: CustomStringConvertible where Result: CustomStringConvertible {
     public var description: String {
         return """
-ExecutionResult(
-    terminationStatus: \(self.terminationStatus.description),
-    value: \(self.value.description)
-)
-"""
+            ExecutionResult(
+                terminationStatus: \(self.terminationStatus.description),
+                value: \(self.value.description)
+            )
+            """
     }
 }
 
-extension ExecutionResult: CustomDebugStringConvertible where Result : CustomDebugStringConvertible {
+extension ExecutionResult: CustomDebugStringConvertible where Result: CustomDebugStringConvertible {
     public var debugDescription: String {
         return """
-ExecutionResult(
-    terminationStatus: \(self.terminationStatus.debugDescription),
-    value: \(self.value.debugDescription)
-)
-"""
+            ExecutionResult(
+                terminationStatus: \(self.terminationStatus.debugDescription),
+                value: \(self.value.debugDescription)
+            )
+            """
     }
 }
-

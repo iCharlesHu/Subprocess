@@ -47,11 +47,12 @@ extension Configuration {
     ) throws -> Execution<Output, Error> {
         _setupMonitorSignalHandler()
 
-        let (executablePath,
-             env, argv,
-             intendedWorkingDir,
-             uidPtr, gidPtr,
-             supplementaryGroups
+        let (
+            executablePath,
+            env, argv,
+            intendedWorkingDir,
+            uidPtr, gidPtr,
+            supplementaryGroups
         ) = try self.preSpawn()
         var processGroupIDPtr: UnsafeMutablePointer<gid_t>? = nil
         if let processGroupID = self.platformOptions.processGroupID {
@@ -72,7 +73,7 @@ extension Configuration {
             outputPipe.writeFileDescriptor?.wrapped.rawValue ?? -1,
             outputPipe.readFileDescriptor?.wrapped.rawValue ?? -1,
             errorPipe.writeFileDescriptor?.wrapped.rawValue ?? -1,
-            errorPipe.readFileDescriptor?.wrapped.rawValue ?? -1
+            errorPipe.readFileDescriptor?.wrapped.rawValue ?? -1,
         ]
 
         var workingDirectory: String?
@@ -87,12 +88,17 @@ extension Configuration {
                 return supplementaryGroups.withOptionalUnsafeBufferPointer { sgroups in
                     return fileDescriptors.withUnsafeBufferPointer { fds in
                         return _subprocess_fork_exec(
-                            &pid, exePath, workingDir,
+                            &pid,
+                            exePath,
+                            workingDir,
                             fds.baseAddress!,
-                            argv, env,
-                            uidPtr, gidPtr,
+                            argv,
+                            env,
+                            uidPtr,
+                            gidPtr,
                             processGroupIDPtr,
-                            CInt(supplementaryGroups?.count ?? 0), sgroups?.baseAddress,
+                            CInt(supplementaryGroups?.count ?? 0),
+                            sgroups?.baseAddress,
                             self.platformOptions.createSession ? 1 : 0,
                             self.platformOptions.preSpawnProcessConfigurator
                         )
@@ -167,7 +173,7 @@ public struct PlatformOptions: Sendable {
 }
 
 extension PlatformOptions: Hashable {
-    public static func ==(
+    public static func == (
         lhs: PlatformOptions,
         rhs: PlatformOptions
     ) -> Bool {
@@ -175,15 +181,12 @@ extension PlatformOptions: Hashable {
         // as long as preSpawnProcessConfigurator is set
         // always returns false so that `PlatformOptions`
         // with it set will never equal to each other
-        if lhs.preSpawnProcessConfigurator != nil ||
-            rhs.preSpawnProcessConfigurator != nil {
+        if lhs.preSpawnProcessConfigurator != nil || rhs.preSpawnProcessConfigurator != nil {
             return false
         }
-        return lhs.userID == rhs.userID &&
-            lhs.groupID == rhs.groupID &&
-            lhs.supplementaryGroups == rhs.supplementaryGroups &&
-            lhs.processGroupID == rhs.processGroupID &&
-            lhs.createSession == rhs.createSession
+        return lhs.userID == rhs.userID && lhs.groupID == rhs.groupID
+            && lhs.supplementaryGroups == rhs.supplementaryGroups && lhs.processGroupID == rhs.processGroupID
+            && lhs.createSession == rhs.createSession
     }
 
     public func hash(into hasher: inout Hasher) {
@@ -202,19 +205,19 @@ extension PlatformOptions: Hashable {
     }
 }
 
-extension PlatformOptions : CustomStringConvertible, CustomDebugStringConvertible {
+extension PlatformOptions: CustomStringConvertible, CustomDebugStringConvertible {
     internal func description(withIndent indent: Int) -> String {
         let indent = String(repeating: " ", count: indent * 4)
         return """
-PlatformOptions(
-\(indent)    userID: \(String(describing: userID)),
-\(indent)    groupID: \(String(describing: groupID)),
-\(indent)    supplementaryGroups: \(String(describing: supplementaryGroups)),
-\(indent)    processGroupID: \(String(describing: processGroupID)),
-\(indent)    createSession: \(createSession),
-\(indent)    preSpawnProcessConfigurator: \(self.preSpawnProcessConfigurator == nil ? "not set" : "set")
-\(indent))
-"""
+            PlatformOptions(
+            \(indent)    userID: \(String(describing: userID)),
+            \(indent)    groupID: \(String(describing: groupID)),
+            \(indent)    supplementaryGroups: \(String(describing: supplementaryGroups)),
+            \(indent)    processGroupID: \(String(describing: processGroupID)),
+            \(indent)    createSession: \(createSession),
+            \(indent)    preSpawnProcessConfigurator: \(self.preSpawnProcessConfigurator == nil ? "not set" : "set")
+            \(indent))
+            """
     }
 
     public var description: String {
@@ -239,7 +242,8 @@ internal func monitorProcessTermination(
     return try await withCheckedThrowingContinuation { continuation in
         _childProcessContinuations.withLock { continuations in
             if let existing = continuations.removeValue(forKey: pid.value),
-               case .status(let existingStatus) = existing {
+                case .status(let existingStatus) = existing
+            {
                 // We already have existing status to report
                 continuation.resume(returning: existingStatus)
             } else {
@@ -255,9 +259,10 @@ private enum ContinuationOrStatus {
     case status(TerminationStatus)
 }
 
-private let _childProcessContinuations: Mutex<
-    [pid_t: ContinuationOrStatus]
-> = Mutex([:])
+private let _childProcessContinuations:
+    Mutex<
+        [pid_t: ContinuationOrStatus]
+    > = Mutex([:])
 
 private let signalSource: SendableSourceSignal = SendableSourceSignal()
 
@@ -285,7 +290,8 @@ private let setup: () = {
                 if let status = status {
                     let pid = siginfo._sifields._sigchld.si_pid
                     if let existing = continuations.removeValue(forKey: pid),
-                       case .continuation(let c) = existing {
+                        case .continuation(let c) = existing
+                    {
                         c.resume(returning: status)
                     } else {
                         // We don't have continuation yet, just state status
@@ -324,5 +330,4 @@ private func _setupMonitorSignalHandler() {
     setup
 }
 
-#endif // canImport(Glibc) || canImport(Bionic) || canImport(Musl)
-
+#endif  // canImport(Glibc) || canImport(Bionic) || canImport(Musl)

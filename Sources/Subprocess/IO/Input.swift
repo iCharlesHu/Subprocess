@@ -32,7 +32,7 @@ public protocol InputProtocol: Sendable {
 /// file handle to the subprocess standard input handle.
 public struct NoInput: InputProtocol {
     internal func createPipe() throws -> CreatedPipe {
-#if os(Windows)
+        #if os(Windows)
         // On Windows, instead of binding to dev null,
         // we don't set the input handle in the `STARTUPINFOW`
         // to signal no input
@@ -40,20 +40,20 @@ public struct NoInput: InputProtocol {
             readFileDescriptor: nil,
             writeFileDescriptor: nil
         )
-#else
+        #else
         let devnull: FileDescriptor = try .openDevNull(withAcessMode: .readOnly)
         return CreatedPipe(
             readFileDescriptor: .init(devnull, closeWhenDone: true),
             writeFileDescriptor: nil
         )
-#endif
+        #endif
     }
 
     public func write(with writer: StandardInputWriter) async throws {
-        /* noop */
+        // noop
     }
 
-    internal init() { }
+    internal init() {}
 }
 
 /// A concrete `Input` type for subprocesses that
@@ -76,7 +76,7 @@ public struct FileDescriptorInput: InputProtocol {
     }
 
     public func write(with writer: StandardInputWriter) async throws {
-        // NOOP
+        // noop
     }
 
     internal init(
@@ -128,10 +128,10 @@ public struct ArrayInput: InputProtocol {
 /// the Subprocess should read its input from `StandardInputWriter`.
 public struct CustomWriteInput: InputProtocol {
     public func write(with writer: StandardInputWriter) async throws {
-        // NOOP
+        // noop
     }
 
-    internal init() { }
+    internal init() {}
 }
 
 extension InputProtocol where Self == NoInput {
@@ -218,12 +218,12 @@ public final actor StandardInputWriter: Sendable {
     /// Write a `RawSpan` to the standard input of the subprocess.
     /// - Parameter span: The span to write
     /// - Returns number of bytes written
-#if SubprocessSpan
+    #if SubprocessSpan
     @available(SubprocessSpan, *)
     public func write(_ span: borrowing RawSpan) async throws -> Int {
         return try await self.fileDescriptor.wrapped.write(span)
     }
-#endif
+    #endif
 
     /// Write a StringProtocol to the standard input of the subprocess.
     /// - Parameters:
@@ -276,7 +276,8 @@ extension StringProtocol {
 
 extension String {
     package init<T: FixedWidthInteger, Encoding: Unicode.Encoding>(
-        decodingBytes bytes: [T], as encoding: Encoding.Type
+        decodingBytes bytes: [T],
+        as encoding: Encoding.Type
     ) {
         self = bytes.withUnsafeBytes { raw in
             String(
@@ -286,4 +287,3 @@ extension String {
         }
     }
 }
-

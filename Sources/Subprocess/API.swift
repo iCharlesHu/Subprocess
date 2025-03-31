@@ -15,7 +15,6 @@ import System
 @preconcurrency import SystemPackage
 #endif
 
-
 // MARK: - Collected Result
 
 /// Run a executable with given parameters asynchrously and returns
@@ -100,7 +99,7 @@ public func run<
         platformOptions: platformOptions
     ).run(input: input, output: output, error: error)
 }
-#endif // SubprocessSpan
+#endif  // SubprocessSpan
 
 // MARK: - Custom Execution Body
 
@@ -185,7 +184,6 @@ public func run<Result, Output: OutputProtocol, Error: OutputProtocol>(
     .run(output: output, error: error, body)
 }
 
-
 // MARK: - Configuration Based
 
 /// Run a `Configuration` asynchrously and returns
@@ -213,7 +211,7 @@ public func run<
         input: input,
         output: output,
         error: error
-    )  { execution in
+    ) { execution in
         let (
             standardOutput,
             standardError
@@ -254,7 +252,6 @@ public func run<Result, Output: OutputProtocol, Error: OutputProtocol>(
 ) async throws -> ExecutionResult<Result> where Output.OutputType == Void, Error.OutputType == Void {
     return try await configuration.run(output: output, error: error, body)
 }
-
 
 // MARK: - Detached
 
@@ -424,4 +421,3 @@ public func runDetached(
         ).processIdentifier
     }
 }
-

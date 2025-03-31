@@ -127,7 +127,7 @@ extension StandardInputWriter {
 }
 
 extension FileDescriptor {
-#if os(Windows)
+    #if os(Windows)
     internal func write(
         _ data: Data
     ) async throws -> Int {
@@ -146,13 +146,21 @@ extension FileDescriptor {
             }
         }
     }
-#else
+    #else
     internal func write(
         _ data: Data
     ) async throws -> Int {
         try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Int, any Error>) in
             let dispatchData = data.withUnsafeBytes {
-                return DispatchData(bytesNoCopy: $0, deallocator: .custom(nil, { /* noop */ }))
+                return DispatchData(
+                    bytesNoCopy: $0,
+                    deallocator: .custom(
+                        nil,
+                        {
+                            // noop
+                        }
+                    )
+                )
             }
             self.write(dispatchData) { writtenLength, error in
                 if let error = error {
@@ -163,7 +171,7 @@ extension FileDescriptor {
             }
         }
     }
-#endif
+    #endif
 }
 
-#endif // SubprocessFoundation
+#endif  // SubprocessFoundation

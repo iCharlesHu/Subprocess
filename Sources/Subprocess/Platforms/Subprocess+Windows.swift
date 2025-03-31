@@ -36,16 +36,7 @@ extension Configuration {
     ) throws -> Execution<Output, Error> {
         // Spawn differently depending on whether
         // we need to spawn as a user
-        if let userCredentials = self.platformOptions.userCredentials {
-            return try self.spawnAsUser(
-                withInput: inputPipe,
-                output: output,
-                outputPipe: outputPipe,
-                error: error,
-                errorPipe: errorPipe,
-                userCredentials: userCredentials
-            )
-        } else {
+        guard let userCredentials = self.platformOptions.userCredentials else {
             return try self.spawnDirect(
                 withInput: inputPipe,
                 output: output,
@@ -54,6 +45,14 @@ extension Configuration {
                 errorPipe: errorPipe
             )
         }
+        return try self.spawnAsUser(
+            withInput: inputPipe,
+            output: output,
+            outputPipe: outputPipe,
+            error: error,
+            errorPipe: errorPipe,
+            userCredentials: userCredentials
+        )
     }
 
     internal func spawnDirect<
@@ -95,8 +94,8 @@ extension Configuration {
                         let created = CreateProcessW(
                             applicationNameW,
                             UnsafeMutablePointer<WCHAR>(mutating: commandAndArgsW),
-                            nil,    // lpProcessAttributes
-                            nil,    // lpThreadAttributes
+                            nil,  // lpProcessAttributes
+                            nil,  // lpThreadAttributes
                             true,  // bInheritHandles
                             createProcessFlags,
                             UnsafeMutableRawPointer(mutating: environmentW),
@@ -385,12 +384,13 @@ public struct PlatformOptions: Sendable {
     /// modification of the `dwCreationFlags` creation flag
     /// and startup info `STARTUPINFOW` before
     /// they are sent to `CreateProcessW()`.
-    public var preSpawnProcessConfigurator: (
-        @Sendable (
-            inout DWORD,
-            inout STARTUPINFOW
-        ) throws -> Void
-    )? = nil
+    public var preSpawnProcessConfigurator:
+        (
+            @Sendable (
+                inout DWORD,
+                inout STARTUPINFOW
+            ) throws -> Void
+        )? = nil
 
     public init() {}
 }
@@ -407,8 +407,8 @@ extension PlatformOptions: Hashable {
         if lhs.preSpawnProcessConfigurator != nil || rhs.preSpawnProcessConfigurator != nil {
             return false
         }
-        return lhs.userCredentials == rhs.userCredentials && lhs.consoleBehavior == rhs.consoleBehavior && lhs.windowStyle == rhs.windowStyle &&
-            lhs.createProcessGroup == rhs.createProcessGroup
+        return lhs.userCredentials == rhs.userCredentials && lhs.consoleBehavior == rhs.consoleBehavior
+            && lhs.windowStyle == rhs.windowStyle && lhs.createProcessGroup == rhs.createProcessGroup
     }
 
     public func hash(into hasher: inout Hasher) {
@@ -426,18 +426,18 @@ extension PlatformOptions: Hashable {
     }
 }
 
-extension PlatformOptions : CustomStringConvertible, CustomDebugStringConvertible {
+extension PlatformOptions: CustomStringConvertible, CustomDebugStringConvertible {
     internal func description(withIndent indent: Int) -> String {
         let indent = String(repeating: " ", count: indent * 4)
         return """
-PlatformOptions(
-\(indent)    userCredentials: \(String(describing: self.userCredentials)),
-\(indent)    consoleBehavior: \(String(describing: self.consoleBehavior)),
-\(indent)    windowStyle: \(String(describing: self.windowStyle)),
-\(indent)    createProcessGroup: \(self.createProcessGroup),
-\(indent)    preSpawnProcessConfigurator: \(self.preSpawnProcessConfigurator == nil ? "not set" : "set")
-\(indent))
-"""
+            PlatformOptions(
+            \(indent)    userCredentials: \(String(describing: self.userCredentials)),
+            \(indent)    consoleBehavior: \(String(describing: self.consoleBehavior)),
+            \(indent)    windowStyle: \(String(describing: self.windowStyle)),
+            \(indent)    createProcessGroup: \(self.createProcessGroup),
+            \(indent)    preSpawnProcessConfigurator: \(self.preSpawnProcessConfigurator == nil ? "not set" : "set")
+            \(indent))
+            """
     }
 
     public var description: String {
@@ -462,11 +462,13 @@ internal func monitorProcessTermination(
             _ = UnregisterWait(waitHandle)
         }
     }
-    guard let processHandle = OpenProcess(
-        DWORD(PROCESS_QUERY_INFORMATION | SYNCHRONIZE),
-        false,
-        pid.value
-    ) else {
+    guard
+        let processHandle = OpenProcess(
+            DWORD(PROCESS_QUERY_INFORMATION | SYNCHRONIZE),
+            false,
+            pid.value
+        )
+    else {
         return .exited(1)
     }
 
@@ -475,16 +477,24 @@ internal func monitorProcessTermination(
         // other work.
         let context = Unmanaged.passRetained(continuation as AnyObject).toOpaque()
         let callback: WAITORTIMERCALLBACK = { context, _ in
-            let continuation = Unmanaged<AnyObject>.fromOpaque(context!).takeRetainedValue() as! CheckedContinuation<Void, any Error>
+            let continuation =
+                Unmanaged<AnyObject>.fromOpaque(context!).takeRetainedValue() as! CheckedContinuation<Void, any Error>
             continuation.resume()
         }
 
         // We only want the callback to fire once (and not be rescheduled.) Waiting
         // may take an arbitrarily long time, so let the thread pool know that too.
         let flags = ULONG(WT_EXECUTEONLYONCE | WT_EXECUTELONGFUNCTION)
-        guard RegisterWaitForSingleObject(
-            &waitHandle, processHandle, callback, context, INFINITE, flags
-        ) else {
+        guard
+            RegisterWaitForSingleObject(
+                &waitHandle,
+                processHandle,
+                callback,
+                context,
+                INFINITE,
+                flags
+            )
+        else {
             continuation.resume(
                 throwing: SubprocessError(
                     code: .init(.failedToMonitorProcess),
@@ -502,11 +512,10 @@ internal func monitorProcessTermination(
         return .exited(1)
     }
     let exitCodeValue = CInt(bitPattern: .init(status))
-    if exitCodeValue >= 0 {
-        return .exited(status)
-    } else {
+    guard exitCodeValue >= 0 else {
         return .unhandledException(status)
     }
+    return .exited(status)
 }
 
 // MARK: - Subprocess Control
@@ -517,12 +526,14 @@ extension Execution {
     /// Terminate the current subprocess with the given exit code
     /// - Parameter exitCode: The exit code to use for the subprocess.
     public func terminate(withExitCode exitCode: DWORD) throws {
-        guard let processHandle = OpenProcess(
-            // PROCESS_ALL_ACCESS
-            DWORD(STANDARD_RIGHTS_REQUIRED | SYNCHRONIZE | 0xFFFF),
-            false,
-            self.processIdentifier.value
-        ) else {
+        guard
+            let processHandle = OpenProcess(
+                // PROCESS_ALL_ACCESS
+                DWORD(STANDARD_RIGHTS_REQUIRED | SYNCHRONIZE | 0xFFFF),
+                false,
+                self.processIdentifier.value
+            )
+        else {
             throw SubprocessError(
                 code: .init(.failedToTerminate),
                 underlyingError: .init(rawValue: GetLastError())
@@ -541,12 +552,14 @@ extension Execution {
 
     /// Suspend the current subprocess
     public func suspend() throws {
-        guard let processHandle = OpenProcess(
-            // PROCESS_ALL_ACCESS
-            DWORD(STANDARD_RIGHTS_REQUIRED | SYNCHRONIZE | 0xFFFF),
-            false,
-            self.processIdentifier.value
-        ) else {
+        guard
+            let processHandle = OpenProcess(
+                // PROCESS_ALL_ACCESS
+                DWORD(STANDARD_RIGHTS_REQUIRED | SYNCHRONIZE | 0xFFFF),
+                false,
+                self.processIdentifier.value
+            )
+        else {
             throw SubprocessError(
                 code: .init(.failedToSuspend),
                 underlyingError: .init(rawValue: GetLastError())
@@ -556,7 +569,7 @@ extension Execution {
             CloseHandle(processHandle)
         }
 
-        let NTSuspendProcess: Optional<(@convention(c) (HANDLE) -> LONG)> =
+        let NTSuspendProcess: (@convention(c) (HANDLE) -> LONG)? =
             unsafeBitCast(
                 GetProcAddress(
                     GetModuleHandleA("ntdll.dll"),
@@ -580,12 +593,14 @@ extension Execution {
 
     /// Resume the current subprocess after suspension
     public func resume() throws {
-        guard let processHandle = OpenProcess(
-            // PROCESS_ALL_ACCESS
-            DWORD(STANDARD_RIGHTS_REQUIRED | SYNCHRONIZE | 0xFFFF),
-            false,
-            self.processIdentifier.value
-        ) else {
+        guard
+            let processHandle = OpenProcess(
+                // PROCESS_ALL_ACCESS
+                DWORD(STANDARD_RIGHTS_REQUIRED | SYNCHRONIZE | 0xFFFF),
+                false,
+                self.processIdentifier.value
+            )
+        else {
             throw SubprocessError(
                 code: .init(.failedToResume),
                 underlyingError: .init(rawValue: GetLastError())
@@ -595,14 +610,14 @@ extension Execution {
             CloseHandle(processHandle)
         }
 
-        let NTResumeProcess: Optional<(@convention(c) (HANDLE) -> LONG)> =
-        unsafeBitCast(
-            GetProcAddress(
-                GetModuleHandleA("ntdll.dll"),
-                "NtResumeProcess"
-            ),
-            to: Optional<(@convention(c) (HANDLE) -> LONG)>.self
-        )
+        let NTResumeProcess: (@convention(c) (HANDLE) -> LONG)? =
+            unsafeBitCast(
+                GetProcAddress(
+                    GetModuleHandleA("ntdll.dll"),
+                    "NtResumeProcess"
+                ),
+                to: Optional<(@convention(c) (HANDLE) -> LONG)>.self
+            )
         guard let NTResumeProcess = NTResumeProcess else {
             throw SubprocessError(
                 code: .init(.failedToResume),
@@ -644,7 +659,10 @@ extension Executable {
                     let pathLenth = SearchPathW(
                         path,
                         exeName,
-                        nil, 0, nil, nil
+                        nil,
+                        0,
+                        nil,
+                        nil
                     )
                     guard pathLenth > 0 else {
                         throw SubprocessError(
@@ -653,13 +671,16 @@ extension Executable {
                         )
                     }
                     return withUnsafeTemporaryAllocation(
-                        of: WCHAR.self, capacity: Int(pathLenth) + 1
+                        of: WCHAR.self,
+                        capacity: Int(pathLenth) + 1
                     ) {
                         _ = SearchPathW(
                             path,
-                            exeName, nil,
+                            exeName,
+                            nil,
                             pathLenth + 1,
-                            $0.baseAddress, nil
+                            $0.baseAddress,
+                            nil
                         )
                         return String(decodingCString: $0.baseAddress!, as: UTF16.self)
                     }
@@ -674,19 +695,19 @@ extension Executable {
 
 // MARK: - Environment Resolution
 extension Environment {
-    internal static let pathEnvironmentVariableName = "Path"
+    internal static let pathVariableName = "Path"
 
     internal func pathValue() -> String? {
         switch self.config {
         case .inherit(let overrides):
             // If PATH value exists in overrides, use it
-            if let value = overrides[Self.pathEnvironmentVariableName] {
+            if let value = overrides[Self.pathVariableName] {
                 return value
             }
             // Fall back to current process
-            return Self.currentEnvironmentValues()[Self.pathEnvironmentVariableName]
+            return Self.currentEnvironmentValues()[Self.pathVariableName]
         case .custom(let fullEnvironment):
-            if let value = fullEnvironment[Self.pathEnvironmentVariableName] {
+            if let value = fullEnvironment[Self.pathVariableName] {
                 return value
             }
             return nil
@@ -743,7 +764,7 @@ extension Configuration {
         intendedWorkingDir: String
     ) {
         // Prepare environment
-        var env: [String : String] = [:]
+        var env: [String: String] = [:]
         switch self.environment.config {
         case .custom(let customValues):
             // Use the custom values directly
@@ -757,17 +778,19 @@ extension Configuration {
         }
         // On Windows, the PATH is required in order to locate dlls needed by
         // the process so we should also pass that to the child
-        let pathVariableName = Environment.pathEnvironmentVariableName
+        let pathVariableName = Environment.pathVariableName
         if env[pathVariableName] == nil,
-           let parentPath = Environment.currentEnvironmentValues()[pathVariableName] {
+            let parentPath = Environment.currentEnvironmentValues()[pathVariableName]
+        {
             env[pathVariableName] = parentPath
         }
         // The environment string must be terminated by a double
         // null-terminator.  Otherwise, CreateProcess will fail with
         // INVALID_PARMETER.
-        let environmentString = env.map {
-            $0.key + "=" + $0.value
-        }.joined(separator: "\0") + "\0\0"
+        let environmentString =
+            env.map {
+                $0.key + "=" + $0.value
+            }.joined(separator: "\0") + "\0\0"
 
         // Prepare arguments
         let (
@@ -778,7 +801,8 @@ extension Configuration {
         guard Self.pathAccessible(self.workingDirectory.string) else {
             throw SubprocessError(
                 code: .init(
-                    .failedToChangeWorkingDirectory(self.workingDirectory.string)),
+                    .failedToChangeWorkingDirectory(self.workingDirectory.string)
+                ),
                 underlyingError: nil
             )
         }
@@ -916,7 +940,7 @@ extension Configuration {
         func quoteWindowsCommandArg(arg: String) -> String {
             // Windows escaping, adapted from Daniel Colascione's "Everyone quotes
             // command line arguments the wrong way" - Microsoft Developer Blog
-            if !arg.contains(where: {" \t\n\"".contains($0)}) {
+            if !arg.contains(where: { " \t\n\"".contains($0) }) {
                 return arg
             }
 
@@ -951,7 +975,7 @@ extension Configuration {
                     break
                 }
                 let backslashCount = unquoted.distance(from: unquoted.startIndex, to: firstNonBackslash)
-                if (unquoted[firstNonBackslash] == "\"") {
+                if unquoted[firstNonBackslash] == "\"" {
                     // This is  a string of \ followed by a " e.g. foo\"bar. Escape the
                     // backslashes and the quote
                     quoted.append(String(repeating: "\\", count: backslashCount * 2 + 1))
@@ -1004,10 +1028,11 @@ extension FileDescriptor {
         var readHandle: HANDLE? = nil
         var writeHandle: HANDLE? = nil
         guard CreatePipe(&readHandle, &writeHandle, &saAttributes, 0),
-              readHandle != INVALID_HANDLE_VALUE,
-              writeHandle != INVALID_HANDLE_VALUE,
-           let readHandle: HANDLE = readHandle,
-           let writeHandle: HANDLE = writeHandle else {
+            readHandle != INVALID_HANDLE_VALUE,
+            writeHandle != INVALID_HANDLE_VALUE,
+            let readHandle: HANDLE = readHandle,
+            let writeHandle: HANDLE = writeHandle
+        else {
             throw SubprocessError(
                 code: .init(.failedToCreatePipe),
                 underlyingError: .init(rawValue: GetLastError())
@@ -1049,12 +1074,12 @@ extension FileDescriptor {
 
     internal func readUntilEOF(
         upToLength maxLength: Int,
-        resultHandler: @Sendable @escaping (Swift.Result<Array<UInt8>, any (Error & Sendable)>) -> Void
+        resultHandler: @Sendable @escaping (Swift.Result<[UInt8], any (Error & Sendable)>) -> Void
     ) {
         DispatchQueue.global(qos: .userInitiated).async {
             var totalBytesRead: Int = 0
             var lastError: DWORD? = nil
-            let values = Array<UInt8>(
+            let values = [UInt8](
                 unsafeUninitializedCapacity: maxLength
             ) { buffer, initializedCount in
                 while true {
@@ -1106,7 +1131,7 @@ extension FileDescriptor {
         }
     }
 
-#if SubprocessSpan
+    #if SubprocessSpan
     @available(SubprocessSpan, *)
     internal func write(
         _ span: borrowing RawSpan
@@ -1124,7 +1149,7 @@ extension FileDescriptor {
             }
         }
     }
-#endif
+    #endif
 
     internal func write(
         _ array: [UInt8]
@@ -1175,12 +1200,11 @@ extension FileDescriptor {
     }
 }
 
-
-private extension Optional where Wrapped == String {
-    func withOptionalCString<Result, Encoding>(
+extension Optional where Wrapped == String {
+    fileprivate func withOptionalCString<Result, Encoding>(
         encodedAs targetEncoding: Encoding.Type,
         _ body: (UnsafePointer<Encoding.CodeUnit>?) throws -> Result
-    ) rethrows -> Result where Encoding : _UnicodeEncoding {
+    ) rethrows -> Result where Encoding: _UnicodeEncoding {
         switch self {
         case .none:
             return try body(nil)
@@ -1189,7 +1213,7 @@ private extension Optional where Wrapped == String {
         }
     }
 
-    func withOptionalNTPathRepresentation<Result>(
+    fileprivate func withOptionalNTPathRepresentation<Result>(
         _ body: (UnsafePointer<WCHAR>?) throws -> Result
     ) throws -> Result {
         switch self {
@@ -1214,12 +1238,16 @@ extension String {
         }
 
         var iter = self.utf8.makeIterator()
-        let bLeadingSlash = if [._slash, ._backslash].contains(iter.next()), iter.next()?.isLetter ?? false, iter.next() == ._colon { true } else { false }
+        let bLeadingSlash =
+            if [._slash, ._backslash].contains(iter.next()), iter.next()?.isLetter ?? false, iter.next() == ._colon {
+                true
+            } else { false }
 
         // Strip the leading `/` on a RFC8089 path (`/[drive-letter]:/...` ).  A
         // leading slash indicates a rooted path on the drive for the current
         // working directory.
-        return try Substring(self.utf8.dropFirst(bLeadingSlash ? 1 : 0)).withCString(encodedAs: UTF16.self) { pwszPath in
+        return try Substring(self.utf8.dropFirst(bLeadingSlash ? 1 : 0)).withCString(encodedAs: UTF16.self) {
+            pwszPath in
             // 1. Normalize the path first.
             let dwLength: DWORD = GetFullPathNameW(pwszPath, 0, nil, nil)
             return try withUnsafeTemporaryAllocation(of: WCHAR.self, capacity: Int(dwLength)) {
@@ -1237,13 +1265,13 @@ extension String {
     }
 }
 
-internal extension UInt8 {
+extension UInt8 {
     static var _slash: UInt8 { UInt8(ascii: "/") }
     static var _backslash: UInt8 { UInt8(ascii: "\\") }
     static var _colon: UInt8 { UInt8(ascii: ":") }
 
     var isLetter: Bool? {
-        return (0x41 ... 0x5a) ~= self || (0x61 ... 0x7a) ~= self
+        return (0x41...0x5a) ~= self || (0x61...0x7a) ~= self
     }
 }
 
@@ -1256,4 +1284,4 @@ extension OutputProtocol {
     }
 }
 
-#endif // canImport(WinSDK)
+#endif  // canImport(WinSDK)
