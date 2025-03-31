@@ -43,16 +43,14 @@ extension DataProtocol {
                 let empty = UnsafeRawBufferPointer(start: nil, count: 0)
                 let span = RawSpan(_unsafeBytes: empty)
                 yield _overrideLifetime(of: span, to: self)
-            }
-            else if self.regions.count == 1 {
+            } else if self.regions.count == 1 {
                 // Easy case: there is only one region in the data
                 let ptr = self.regions.first!.withUnsafeBytes { ptr in
                     return ptr
                 }
                 let span = RawSpan(_unsafeBytes: ptr)
                 yield _overrideLifetime(of: span, to: self)
-            }
-            else {
+            } else {
                 // This data contains discontiguous chunks. We have to
                 // copy and make a contiguous chunk
                 var contiguous: ContiguousArray<UInt8>?
@@ -73,4 +71,4 @@ extension DataProtocol {
     }
 }
 
-#endif // SubprocessFoundation
+#endif  // SubprocessFoundation

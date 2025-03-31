@@ -14,7 +14,7 @@ let package = Package(
         .library(
             name: "Subprocess",
             targets: ["Subprocess"]
-        ),
+        )
     ],
     dependencies: [
         .package(
@@ -36,13 +36,13 @@ let package = Package(
             path: "Sources/Subprocess",
             exclude: [
                 "Span+Subprocess.swift",
-                "SubprocessFoundation/Span+SubprocessFoundation.swift"
+                "SubprocessFoundation/Span+SubprocessFoundation.swift",
             ],
             swiftSettings: [
                 .enableExperimentalFeature("StrictConcurrency"),
                 .enableExperimentalFeature("NonescapableTypes"),
                 .define("SubprocessFoundation"),
-                availabilityMacro
+                availabilityMacro,
             ]
         ),
         .testTarget(
@@ -61,7 +61,7 @@ let package = Package(
         .target(
             name: "TestResources",
             dependencies: [
-                .product(name: "SystemPackage", package: "swift-system"),
+                .product(name: "SystemPackage", package: "swift-system")
             ],
             path: "Tests/TestResources",
             resources: [

@@ -62,12 +62,13 @@ public struct PlatformOptions: Sendable {
     /// modification of the `posix_spawnattr_t` spawn attribute
     /// and file actions `posix_spawn_file_actions_t` before
     /// they are sent to `posix_spawn()`.
-    public var preSpawnProcessConfigurator: (
-        @Sendable (
-            inout posix_spawnattr_t?,
-            inout posix_spawn_file_actions_t?
-        ) throws -> Void
-    )? = nil
+    public var preSpawnProcessConfigurator:
+        (
+            @Sendable (
+                inout posix_spawnattr_t?,
+                inout posix_spawn_file_actions_t?
+            ) throws -> Void
+        )? = nil
 
     public init() {}
 }
@@ -78,16 +79,12 @@ extension PlatformOptions: Hashable {
         // as long as preSpawnProcessConfigurator is set
         // always returns false so that `PlatformOptions`
         // with it set will never equal to each other
-        if lhs.preSpawnProcessConfigurator != nil ||
-            rhs.preSpawnProcessConfigurator != nil {
+        if lhs.preSpawnProcessConfigurator != nil || rhs.preSpawnProcessConfigurator != nil {
             return false
         }
-        return lhs.qualityOfService == rhs.qualityOfService &&
-        lhs.userID == rhs.userID &&
-        lhs.groupID == rhs.groupID &&
-        lhs.supplementaryGroups == rhs.supplementaryGroups &&
-        lhs.processGroupID == rhs.processGroupID &&
-        lhs.createSession == rhs.createSession
+        return lhs.qualityOfService == rhs.qualityOfService && lhs.userID == rhs.userID && lhs.groupID == rhs.groupID
+            && lhs.supplementaryGroups == rhs.supplementaryGroups && lhs.processGroupID == rhs.processGroupID
+            && lhs.createSession == rhs.createSession
     }
 
     public func hash(into hasher: inout Hasher) {
@@ -107,20 +104,20 @@ extension PlatformOptions: Hashable {
     }
 }
 
-extension PlatformOptions : CustomStringConvertible, CustomDebugStringConvertible {
+extension PlatformOptions: CustomStringConvertible, CustomDebugStringConvertible {
     internal func description(withIndent indent: Int) -> String {
         let indent = String(repeating: " ", count: indent * 4)
         return """
-PlatformOptions(
-\(indent)    qualityOfService: \(self.qualityOfService),
-\(indent)    userID: \(String(describing: userID)),
-\(indent)    groupID: \(String(describing: groupID)),
-\(indent)    supplementaryGroups: \(String(describing: supplementaryGroups)),
-\(indent)    processGroupID: \(String(describing: processGroupID)),
-\(indent)    createSession: \(createSession),
-\(indent)    preSpawnProcessConfigurator: \(self.preSpawnProcessConfigurator == nil ? "not set" : "set")
-\(indent))
-"""
+            PlatformOptions(
+            \(indent)    qualityOfService: \(self.qualityOfService),
+            \(indent)    userID: \(String(describing: userID)),
+            \(indent)    groupID: \(String(describing: groupID)),
+            \(indent)    supplementaryGroups: \(String(describing: supplementaryGroups)),
+            \(indent)    processGroupID: \(String(describing: processGroupID)),
+            \(indent)    createSession: \(createSession),
+            \(indent)    preSpawnProcessConfigurator: \(self.preSpawnProcessConfigurator == nil ? "not set" : "set")
+            \(indent))
+            """
     }
 
     public var description: String {
@@ -131,7 +128,6 @@ PlatformOptions(
         return self.description(withIndent: 0)
     }
 }
-
 
 // MARK: - Spawn
 extension Configuration {
@@ -148,7 +144,8 @@ extension Configuration {
         error: Error,
         errorPipe: CreatedPipe
     ) throws -> Execution<Output, Error> {
-        let (executablePath,
+        let (
+            executablePath,
             env, argv,
             intendedWorkingDir,
             uidPtr, gidPtr, supplementaryGroups
@@ -248,8 +245,7 @@ extension Configuration {
         posix_spawnattr_setsigdefault(&spawnAttributes, &allSignals)
         // Configure spawnattr
         var spawnAttributeError: Int32 = 0
-        var flags: Int32 = POSIX_SPAWN_CLOEXEC_DEFAULT |
-            POSIX_SPAWN_SETSIGMASK | POSIX_SPAWN_SETSIGDEF
+        var flags: Int32 = POSIX_SPAWN_CLOEXEC_DEFAULT | POSIX_SPAWN_SETSIGMASK | POSIX_SPAWN_SETSIGDEF
         if let pgid = self.platformOptions.processGroupID {
             flags |= POSIX_SPAWN_SETPGROUP
             spawnAttributeError = posix_spawnattr_setpgroup(&spawnAttributes, pid_t(pgid))
@@ -258,7 +254,7 @@ extension Configuration {
         // Set QualityOfService
         // spanattr_qos seems to only accept `QOS_CLASS_UTILITY` or `QOS_CLASS_BACKGROUND`
         // and returns an error of `EINVAL` if anything else is provided
-        if spawnAttributeError == 0 && self.platformOptions.qualityOfService == .utility{
+        if spawnAttributeError == 0 && self.platformOptions.qualityOfService == .utility {
             spawnAttributeError = posix_spawnattr_set_qos_class_np(&spawnAttributes, QOS_CLASS_UTILITY)
         } else if spawnAttributeError == 0 && self.platformOptions.qualityOfService == .background {
             spawnAttributeError = posix_spawnattr_set_qos_class_np(&spawnAttributes, QOS_CLASS_BACKGROUND)
@@ -298,11 +294,16 @@ extension Configuration {
         let spawnError: CInt = executablePath.withCString { exePath in
             return supplementaryGroups.withOptionalUnsafeBufferPointer { sgroups in
                 return _subprocess_spawn(
-                    &pid, exePath,
-                    &fileActions, &spawnAttributes,
-                    argv, env,
-                    uidPtr, gidPtr,
-                    Int32(supplementaryGroups?.count ?? 0), sgroups?.baseAddress,
+                    &pid,
+                    exePath,
+                    &fileActions,
+                    &spawnAttributes,
+                    argv,
+                    env,
+                    uidPtr,
+                    gidPtr,
+                    Int32(supplementaryGroups?.count ?? 0),
+                    sgroups?.baseAddress,
                     self.platformOptions.createSession ? 1 : 0
                 )
             }
@@ -372,4 +373,4 @@ internal func monitorProcessTermination(
     }
 }
 
-#endif // canImport(Darwin)
+#endif  // canImport(Darwin)

@@ -126,11 +126,11 @@ extension SubprocessError {
     /// - On Unix-like systems, `UnderlyingError` wraps `errno` from libc;
     /// - On Windows, `UnderlyingError` wraps Windows Error code
     public struct UnderlyingError: Swift.Error, RawRepresentable, Hashable, Sendable {
-#if os(Windows)
+        #if os(Windows)
         public typealias RawValue = DWORD
-#else
+        #else
         public typealias RawValue = Int32
-#endif
+        #endif
 
         public let rawValue: RawValue
 
@@ -139,4 +139,3 @@ extension SubprocessError {
         }
     }
 }
-

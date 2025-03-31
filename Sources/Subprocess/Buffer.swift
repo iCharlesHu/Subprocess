@@ -17,19 +17,19 @@
 extension SequenceOutput {
     /// A immutable collection of bytes
     public struct Buffer: Sendable {
-#if os(Windows)
+        #if os(Windows)
         private var data: [UInt8]
 
         internal init(data: [UInt8]) {
             self.data = data
         }
-#else
+        #else
         private var data: DispatchData
 
         internal init(data: DispatchData) {
             self.data = data
         }
-#endif
+        #endif
     }
 }
 
@@ -64,27 +64,27 @@ extension SequenceOutput.Buffer {
     public func withUnsafeBytes<ResultType>(
         _ body: (UnsafeRawBufferPointer) throws -> ResultType
     ) rethrows -> ResultType {
-#if os(Windows)
+        #if os(Windows)
         return try self.data.withUnsafeBytes(body)
-#else
+        #else
         // Although DispatchData was designed to be uncontiguous, in practice
         // we found that almost all DispatchData are contiguous.
         return try self.data.withUnsafeBytes { ptr in
             let bytes = UnsafeRawBufferPointer(start: ptr, count: self.data.count)
             return try body(bytes)
         }
-#endif
+        #endif
     }
 
-#if SubprocessSpan
+    #if SubprocessSpan
     // Access the storge backing this Buffer
     public var bytes: RawSpan {
         var backing: SpanBacking?
-#if os(Windows)
+        #if os(Windows)
         self.data.withUnsafeBufferPointer {
             backing = .pointer($0)
         }
-#else
+        #else
         self.data.enumerateBytes { buffer, byteIndex, stop in
             if _fastPath(backing == nil) {
                 // In practice, almost all `DispatchData` is contiguous
@@ -103,7 +103,7 @@ extension SequenceOutput.Buffer {
                 }
             }
         }
-#endif
+        #endif
         guard let backing = backing else {
             let empty = UnsafeRawBufferPointer(start: nil, count: 0)
             let span = RawSpan(_unsafeBytes: empty)
@@ -119,7 +119,7 @@ extension SequenceOutput.Buffer {
             return _overrideLifetime(of: span, to: self)
         }
     }
-#endif // SubprocessSpan
+    #endif  // SubprocessSpan
 
     private enum SpanBacking {
         case pointer(UnsafeBufferPointer<UInt8>)
@@ -127,15 +127,14 @@ extension SequenceOutput.Buffer {
     }
 }
 
-
 // MARK: - Hashable, Equatable
 #if SubprocessSpan
 @available(SubprocessSpan, *)
 #endif
 extension SequenceOutput.Buffer: Equatable, Hashable {
-#if os(Windows)
+    #if os(Windows)
     // Compiler generated conformances
-#else
+    #else
     public static func == (lhs: SequenceOutput.Buffer, rhs: SequenceOutput.Buffer) -> Bool {
         return lhs.data.elementsEqual(rhs.data)
     }
@@ -149,6 +148,5 @@ extension SequenceOutput.Buffer: Equatable, Hashable {
             hasher.combine(bytes: bytes)
         }
     }
-#endif
+    #endif
 }
-

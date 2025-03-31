@@ -35,7 +35,7 @@ package import Dispatch
 
 /// Signals are standardized messages sent to a running program
 /// to trigger specific behavior, such as quitting or error handling.
-public struct Signal : Hashable, Sendable {
+public struct Signal: Hashable, Sendable {
     /// The underlying platform specific value for the signal
     public let rawValue: Int32
 
@@ -102,7 +102,7 @@ public struct ProcessIdentifier: Sendable, Hashable, Codable {
     }
 }
 
-extension ProcessIdentifier : CustomStringConvertible, CustomDebugStringConvertible {
+extension ProcessIdentifier: CustomStringConvertible, CustomDebugStringConvertible {
     public var description: String { "\(self.value)" }
 
     public var debugDescription: String { "\(self.value)" }
@@ -139,7 +139,7 @@ extension Execution {
             }
             // Ignore ESRCH (no such process)
             if let underlyingError = posixError.underlyingError,
-               underlyingError.rawValue != ESRCH
+                underlyingError.rawValue != ESRCH
             {
                 return error
             }
@@ -150,24 +150,24 @@ extension Execution {
 
 // MARK: - Environment Resolution
 extension Environment {
-    internal static let pathEnvironmentVariableName = "PATH"
+    internal static let pathVariableName = "PATH"
 
     internal func pathValue() -> String? {
         switch self.config {
         case .inherit(let overrides):
             // If PATH value exists in overrides, use it
-            if let value = overrides[Self.pathEnvironmentVariableName] {
+            if let value = overrides[Self.pathVariableName] {
                 return value
             }
             // Fall back to current process
-            return Self.currentEnvironmentValues()[Self.pathEnvironmentVariableName]
+            return Self.currentEnvironmentValues()[Self.pathVariableName]
         case .custom(let fullEnvironment):
-            if let value = fullEnvironment[Self.pathEnvironmentVariableName] {
+            if let value = fullEnvironment[Self.pathVariableName] {
                 return value
             }
             return nil
         case .rawBytes(let rawBytesArray):
-            let needle: [UInt8] = Array("\(Self.pathEnvironmentVariableName)=".utf8)
+            let needle: [UInt8] = Array("\(Self.pathVariableName)=".utf8)
             for row in rawBytesArray {
                 guard row.starts(with: needle) else {
                     continue
@@ -196,11 +196,11 @@ extension Environment {
             /// length = `key` + `=` + `value` + `\null`
             let totalLength = keyContainer.count + 1 + valueContainer.count + 1
             let fullString: UnsafeMutablePointer<CChar> = .allocate(capacity: totalLength)
-#if canImport(Darwin)
+            #if canImport(Darwin)
             _ = snprintf(ptr: fullString, totalLength, "%s=%s", rawByteKey, rawByteValue)
-#else
+            #else
             _ = _shims_snprintf(fullString, CInt(totalLength), "%s=%s", rawByteKey, rawByteValue)
-#endif
+            #endif
             return fullString
         }
 
@@ -237,8 +237,10 @@ extension Environment {
         var values: [UnsafeMutablePointer<CChar>] = []
         // This lock is taken by calls to getenv, so we want as few callouts to other code as possible here.
         _subprocess_lock_environ()
-        guard let environments: UnsafeMutablePointer<UnsafeMutablePointer<CChar>?> =
-                _subprocess_get_environ() else {
+        guard
+            let environments: UnsafeMutablePointer<UnsafeMutablePointer<CChar>?> =
+                _subprocess_get_environ()
+        else {
             _subprocess_unlock_environ()
             return body([])
         }
@@ -278,7 +280,7 @@ extension Executable {
             "/bin",
             "/usr/sbin",
             "/sbin",
-            "/usr/local/bin"
+            "/usr/local/bin",
         ])
     }
 
@@ -348,7 +350,8 @@ extension Configuration {
             for ptr in argv { ptr?.deallocate() }
             throw SubprocessError(
                 code: .init(
-                    .failedToChangeWorkingDirectory(intendedWorkingDir.string)),
+                    .failedToChangeWorkingDirectory(intendedWorkingDir.string)
+                ),
                 underlyingError: nil
             )
         }
@@ -474,14 +477,22 @@ extension FileDescriptor {
         }
     }
 
-#if SubprocessSpan
+    #if SubprocessSpan
     @available(SubprocessSpan, *)
     package func write(
         _ span: borrowing RawSpan
     ) async throws -> Int {
         try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Int, any Error>) in
             let dispatchData = span.withUnsafeBytes {
-                return DispatchData(bytesNoCopy: $0, deallocator: .custom(nil, { /* noop */ }))
+                return DispatchData(
+                    bytesNoCopy: $0,
+                    deallocator: .custom(
+                        nil,
+                        {
+                            // noop
+                        }
+                    )
+                )
             }
             self.write(dispatchData) { writtenLength, error in
                 if let error = error {
@@ -492,14 +503,22 @@ extension FileDescriptor {
             }
         }
     }
-#endif // SubprocessSpan
+    #endif  // SubprocessSpan
 
     package func write(
         _ array: [UInt8]
     ) async throws -> Int {
         try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Int, any Error>) in
             let dispatchData = array.withUnsafeBytes {
-                return DispatchData(bytesNoCopy: $0, deallocator: .custom(nil, { /* noop */ }))
+                return DispatchData(
+                    bytesNoCopy: $0,
+                    deallocator: .custom(
+                        nil,
+                        {
+                            // noop
+                        }
+                    )
+                )
             }
             self.write(dispatchData) { writtenLength, error in
                 if let error = error {
@@ -543,12 +562,12 @@ internal typealias PlatformFileDescriptor = FileDescriptor
 // MARK: - Read Buffer Size
 @inline(__always)
 internal var readBufferSize: Int {
-#if canImport(Darwin)
+    #if canImport(Darwin)
     return 16384
-#else
+    #else
     // FIXME: Use Platform.pageSize here
     return 4096
-#endif // canImport(Darwin)
+    #endif  // canImport(Darwin)
 }
 
-#endif // canImport(Darwin) || canImport(Glibc) || canImport(Bionic) || canImport(Musl)
+#endif  // canImport(Darwin) || canImport(Glibc) || canImport(Bionic) || canImport(Musl)

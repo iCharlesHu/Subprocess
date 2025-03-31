@@ -17,7 +17,6 @@ import FoundationEssentials
 import Foundation
 #endif
 
-
 /// A concrete `Output` type for subprocesses that collects output
 /// from the subprocess as `Data`. This option must be used with
 /// the `run()` method that returns a `CollectedResult`
@@ -28,15 +27,15 @@ public struct DataOutput: OutputProtocol {
     public typealias OutputType = Data
     public let maxSize: Int
 
-#if SubprocessSpan
+    #if SubprocessSpan
     public func output(from span: RawSpan) throws -> Data {
         return Data(span)
     }
-#else
+    #else
     public func output(from buffer: some Sequence<UInt8>) throws -> Data {
         return Data(buffer)
     }
-#endif
+    #endif
 
     internal init(limit: Int) {
         self.maxSize = limit
@@ -55,7 +54,7 @@ extension OutputProtocol where Self == DataOutput {
 
     /// Create a `Subprocess` output that collects output as `Data`
     /// with given max number of bytes to collect.
-    public static func data(limit: Int) -> Self  {
+    public static func data(limit: Int) -> Self {
         return .init(limit: limit)
     }
 }
@@ -72,5 +71,4 @@ extension OutputProtocol {
 }
 #endif
 
-#endif // SubprocessFoundation
-
+#endif  // SubprocessFoundation

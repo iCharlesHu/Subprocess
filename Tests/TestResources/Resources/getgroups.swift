@@ -18,5 +18,5 @@ guard getgroups(ngroups, &groups) >= 0 else {
     perror("getgroups failed")
     exit(errno)
 }
-let result = groups.map{ String($0) }.joined(separator: ",")
+let result = groups.map { String($0) }.joined(separator: ",")
 print(result)

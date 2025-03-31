@@ -36,14 +36,14 @@ let package = Package(
         .library(
             name: "Subprocess",
             targets: ["Subprocess"]
-        ),
+        )
     ],
     traits: [
         "SubprocessFoundation",
         "SubprocessSpan",
         .default(
             enabledTraits: defaultTraits
-        )
+        ),
     ],
     dependencies: dep,
     targets: [
@@ -59,7 +59,7 @@ let package = Package(
                 .enableExperimentalFeature("NonescapableTypes"),
                 .enableExperimentalFeature("LifetimeDependence"),
                 .enableExperimentalFeature("Span"),
-                availabilityMacro
+                availabilityMacro,
             ]
         ),
         .testTarget(
@@ -72,14 +72,14 @@ let package = Package(
             ],
             swiftSettings: [
                 .enableExperimentalFeature("Span"),
-                availabilityMacro
+                availabilityMacro,
             ]
         ),
 
         .target(
             name: "TestResources",
             dependencies: [
-                .product(name: "SystemPackage", package: "swift-system"),
+                .product(name: "SystemPackage", package: "swift-system")
             ],
             path: "Tests/TestResources",
             resources: [

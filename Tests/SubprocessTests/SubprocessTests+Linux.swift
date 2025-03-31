@@ -32,8 +32,7 @@ struct SubprocessLinuxTests {
         #expect(idResult.terminationStatus.isSuccess)
         let id = try #require(idResult.standardOutput)
         #expect(
-            id.trimmingCharacters(in: .whitespacesAndNewlines) ==
-            "\(4321)"
+            id.trimmingCharacters(in: .whitespacesAndNewlines) == "\(4321)"
         )
     }
 
@@ -86,4 +85,4 @@ struct SubprocessLinuxTests {
     }
 }
 
-#endif // canImport(Glibc) || canImport(Bionic) || canImport(Musl)
+#endif  // canImport(Glibc) || canImport(Bionic) || canImport(Musl)

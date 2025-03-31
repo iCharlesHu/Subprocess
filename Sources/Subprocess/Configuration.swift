@@ -126,7 +126,7 @@ public struct Configuration: Sendable, Hashable {
         }
     }
 
-#if SubprocessSpan
+    #if SubprocessSpan
     @available(SubprocessSpan, *)
     internal func run<
         InputElement: BitwiseCopyable,
@@ -184,7 +184,12 @@ public struct Configuration: Sendable, Hashable {
                     #else
                     let bytes = DispatchData(
                         bytesNoCopy: ptr,
-                        deallocator: .custom(nil, { /* noop */ })
+                        deallocator: .custom(
+                            nil,
+                            {
+                                // noop
+                            }
+                        )
                     )
                     #endif
 
@@ -220,7 +225,7 @@ public struct Configuration: Sendable, Hashable {
             )
         }
     }
-#endif // SubprocessSpan
+    #endif  // SubprocessSpan
 
     #if SubprocessSpan
     @available(SubprocessSpan, *)
@@ -306,29 +311,29 @@ public struct Configuration: Sendable, Hashable {
     }
 }
 
-extension Configuration : CustomStringConvertible, CustomDebugStringConvertible {
+extension Configuration: CustomStringConvertible, CustomDebugStringConvertible {
     public var description: String {
         return """
-Configuration(
-    executable: \(self.executable.description),
-    arguments: \(self.arguments.description),
-    environment: \(self.environment.description),
-    workingDirectory: \(self.workingDirectory),
-    platformOptions: \(self.platformOptions.description(withIndent: 1))
-)
-"""
+            Configuration(
+                executable: \(self.executable.description),
+                arguments: \(self.arguments.description),
+                environment: \(self.environment.description),
+                workingDirectory: \(self.workingDirectory),
+                platformOptions: \(self.platformOptions.description(withIndent: 1))
+            )
+            """
     }
 
     public var debugDescription: String {
         return """
-Configuration(
-    executable: \(self.executable.debugDescription),
-    arguments: \(self.arguments.debugDescription),
-    environment: \(self.environment.debugDescription),
-    workingDirectory: \(self.workingDirectory),
-    platformOptions: \(self.platformOptions.description(withIndent: 1))
-)
-"""
+            Configuration(
+                executable: \(self.executable.debugDescription),
+                arguments: \(self.arguments.debugDescription),
+                environment: \(self.environment.debugDescription),
+                workingDirectory: \(self.workingDirectory),
+                platformOptions: \(self.platformOptions.description(withIndent: 1))
+            )
+            """
     }
 }
 
@@ -374,7 +379,7 @@ extension Configuration {
 
         var inputError: Swift.Error?
         var outputError: Swift.Error?
-        var errorError: Swift.Error? // lol
+        var errorError: Swift.Error?  // lol
 
         if childSide {
             inputError = captureError {
@@ -491,7 +496,7 @@ public struct Executable: Sendable, Hashable {
     }
 }
 
-extension Executable : CustomStringConvertible, CustomDebugStringConvertible {
+extension Executable: CustomStringConvertible, CustomDebugStringConvertible {
     public var description: String {
         switch storage {
         case .executable(let executableName):
@@ -531,7 +536,7 @@ public struct Arguments: Sendable, ExpressibleByArrayLiteral, Hashable {
         self.executablePathOverride = nil
     }
 
-#if !os(Windows) // Windows does NOT support arg0 override
+    #if !os(Windows)  // Windows does NOT support arg0 override
     /// Create an `Argument` object using the given values, but
     /// override the first Argument value to `executablePathOverride`.
     /// If `executablePathOverride` is nil,
@@ -557,7 +562,7 @@ public struct Arguments: Sendable, ExpressibleByArrayLiteral, Hashable {
     /// - Parameters:
     ///   - executablePathOverride: the value to override the first argument.
     ///   - remainingValues: the rest of the argument value
-    public init(executablePathOverride: [UInt8]?, remainingValues: Array<[UInt8]>) {
+    public init(executablePathOverride: [UInt8]?, remainingValues: [[UInt8]]) {
         self.storage = remainingValues.map { .rawBytes($0) }
         if let override = executablePathOverride {
             self.executablePathOverride = .rawBytes(override)
@@ -566,14 +571,14 @@ public struct Arguments: Sendable, ExpressibleByArrayLiteral, Hashable {
         }
     }
 
-    public init(_ array: Array<[UInt8]>) {
+    public init(_ array: [[UInt8]]) {
         self.storage = array.map { .rawBytes($0) }
         self.executablePathOverride = nil
     }
-#endif
+    #endif
 }
 
-extension Arguments : CustomStringConvertible, CustomDebugStringConvertible {
+extension Arguments: CustomStringConvertible, CustomDebugStringConvertible {
     public var description: String {
         var result: [String] = self.storage.map(\.description)
 
@@ -591,11 +596,11 @@ extension Arguments : CustomStringConvertible, CustomDebugStringConvertible {
 /// A set of environment variables to use when executing the subprocess.
 public struct Environment: Sendable, Hashable {
     internal enum Configuration: Sendable, Hashable {
-        case inherit([String : String])
-        case custom([String : String])
-#if !os(Windows)
-        case rawBytes(Array<[UInt8]>)
-#endif
+        case inherit([String: String])
+        case custom([String: String])
+        #if !os(Windows)
+        case rawBytes([[UInt8]])
+        #endif
     }
 
     internal let config: Configuration
@@ -609,42 +614,42 @@ public struct Environment: Sendable, Hashable {
         return .init(config: .inherit([:]))
     }
     /// Override the provided `newValue` in the existing `Environment`
-    public func updating(_ newValue: [String : String]) -> Self {
+    public func updating(_ newValue: [String: String]) -> Self {
         return .init(config: .inherit(newValue))
     }
     /// Use custom environment variables
-    public static func custom(_ newValue: [String : String]) -> Self {
+    public static func custom(_ newValue: [String: String]) -> Self {
         return .init(config: .custom(newValue))
     }
 
-#if !os(Windows)
+    #if !os(Windows)
     /// Use custom environment variables of raw bytes
-    public static func custom(_ newValue: Array<[UInt8]>) -> Self {
+    public static func custom(_ newValue: [[UInt8]]) -> Self {
         return .init(config: .rawBytes(newValue))
     }
-#endif
+    #endif
 }
 
-extension Environment : CustomStringConvertible, CustomDebugStringConvertible {
+extension Environment: CustomStringConvertible, CustomDebugStringConvertible {
     public var description: String {
         switch self.config {
         case .custom(let customDictionary):
             return """
-            Custom environment:
-            \(customDictionary)
-            """
+                Custom environment:
+                \(customDictionary)
+                """
         case .inherit(let updateValue):
             return """
-            Inherting current environment with updates:
-            \(updateValue)
-            """
-#if !os(Windows)
+                Inherting current environment with updates:
+                \(updateValue)
+                """
+        #if !os(Windows)
         case .rawBytes(let rawBytes):
             return """
-            Raw bytes:
-            \(rawBytes)
-            """
-#endif
+                Raw bytes:
+                \(rawBytes)
+                """
+        #endif
         }
     }
 
@@ -652,13 +657,13 @@ extension Environment : CustomStringConvertible, CustomDebugStringConvertible {
         return self.description
     }
 
-    internal static func currentEnvironmentValues() -> [String : String] {
+    internal static func currentEnvironmentValues() -> [String: String] {
         return self.withCopiedEnv { environments in
-            var results: [String : String] = [:]
+            var results: [String: String] = [:]
             for env in environments {
                 let environmentString = String(cString: env)
 
-#if os(Windows)
+                #if os(Windows)
                 // Windows GetEnvironmentStringsW API can return
                 // magic environment variables set by the cmd shell
                 // that starts with `=`
@@ -666,14 +671,16 @@ extension Environment : CustomStringConvertible, CustomDebugStringConvertible {
                 if environmentString.utf8.first == Character("=").utf8.first {
                     continue
                 }
-#endif // os(Windows)
+                #endif  // os(Windows)
 
                 guard let delimiter = environmentString.firstIndex(of: "=") else {
                     continue
                 }
 
-                let key = String(environmentString[environmentString.startIndex ..< delimiter])
-                let value = String(environmentString[environmentString.index(after: delimiter) ..< environmentString.endIndex])
+                let key = String(environmentString[environmentString.startIndex..<delimiter])
+                let value = String(
+                    environmentString[environmentString.index(after: delimiter)..<environmentString.endIndex]
+                )
                 results[key] = value
             }
             return results
@@ -686,11 +693,11 @@ extension Environment : CustomStringConvertible, CustomDebugStringConvertible {
 /// An exit status of a subprocess.
 @frozen
 public enum TerminationStatus: Sendable, Hashable, Codable {
-#if canImport(WinSDK)
+    #if canImport(WinSDK)
     public typealias Code = DWORD
-#else
+    #else
     public typealias Code = CInt
-#endif
+    #endif
 
     /// The subprocess was existed with the given code
     case exited(Code)
@@ -707,7 +714,7 @@ public enum TerminationStatus: Sendable, Hashable, Codable {
     }
 }
 
-extension TerminationStatus : CustomStringConvertible, CustomDebugStringConvertible {
+extension TerminationStatus: CustomStringConvertible, CustomDebugStringConvertible {
     public var description: String {
         switch self {
         case .exited(let code):
@@ -832,10 +839,12 @@ internal struct CreatedPipe {
         let pipe = try FileDescriptor.pipe()
 
         self.readFileDescriptor = .init(
-            pipe.readEnd, closeWhenDone: closeWhenDone
+            pipe.readEnd,
+            closeWhenDone: closeWhenDone
         )
         self.writeFileDescriptor = .init(
-            pipe.writeEnd, closeWhenDone: closeWhenDone
+            pipe.writeEnd,
+            closeWhenDone: closeWhenDone
         )
     }
 }
@@ -848,13 +857,13 @@ extension FilePath {
     }
 }
 
-extension Optional where Wrapped : Collection {
+extension Optional where Wrapped: Collection {
     func withOptionalUnsafeBufferPointer<Result>(
         _ body: ((UnsafeBufferPointer<Wrapped.Element>)?) throws -> Result
     ) rethrows -> Result {
         switch self {
         case .some(let wrapped):
-            guard let array: Array<Wrapped.Element> = wrapped as? Array else {
+            guard let array: [Wrapped.Element] = wrapped as? Array else {
                 return try body(nil)
             }
             return try array.withUnsafeBufferPointer { ptr in
@@ -887,11 +896,11 @@ extension Optional where Wrapped == String {
 
 // MARK: - Stubs for the one from Foundation
 public enum QualityOfService: Int, Sendable {
-    case userInteractive    = 0x21
-    case userInitiated      = 0x19
-    case utility            = 0x11
-    case background         = 0x09
-    case `default`          = -1
+    case userInteractive = 0x21
+    case userInitiated = 0x19
+    case utility = 0x11
+    case background = 0x09
+    case `default` = -1
 }
 
 internal func withAsyncTaskCleanupHandler<Result>(
@@ -920,4 +929,3 @@ internal func withAsyncTaskCleanupHandler<Result>(
         }
     }
 }
-

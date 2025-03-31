@@ -21,7 +21,6 @@ import System
 @preconcurrency import SystemPackage
 #endif
 
-
 package var prideAndPrejudice: FilePath {
     let path = Bundle.module.url(
         forResource: "PrideAndPrejudice",
@@ -60,16 +59,15 @@ package var windowsTester: FilePath {
 
 extension URL {
     package var _fileSystemPath: String {
-#if canImport(WinSDK)
+        #if canImport(WinSDK)
         var path = self.path(percentEncoded: false)
         if path.starts(with: "/") {
             path.removeFirst()
             return path
         }
         return path
-#else
+        #else
         return self.path(percentEncoded: false)
-#endif
+        #endif
     }
 }
-

@@ -48,8 +48,7 @@ extension SubprocessWindowsTests {
         #expect(result.terminationStatus.isSuccess)
         #expect(
             result.standardOutput?
-                .trimmingCharacters(in: .whitespacesAndNewlines) ==
-            "\"\(message)\""
+                .trimmingCharacters(in: .whitespacesAndNewlines) == "\"\(message)\""
         )
     }
 
@@ -83,8 +82,7 @@ extension SubprocessWindowsTests {
         #expect(result.terminationStatus.isSuccess)
         #expect(
             result.standardOutput?
-                .trimmingCharacters(in: .whitespacesAndNewlines) ==
-            expected
+                .trimmingCharacters(in: .whitespacesAndNewlines) == expected
         )
     }
 
@@ -100,7 +98,8 @@ extension SubprocessWindowsTests {
             Issue.record("Expected to throw POSIXError")
         } catch {
             guard let subprocessError = error as? SubprocessError,
-                  let underlying = subprocessError.underlyingError else {
+                let underlying = subprocessError.underlyingError
+            else {
                 Issue.record("Expected CocoaError, got \(error)")
                 return
             }
@@ -119,7 +118,7 @@ extension SubprocessWindowsTests {
         let args: [String] = [
             "/c",
             "echo",
-            message
+            message,
         ]
         let result = try await Subprocess.run(
             self.cmdExe,
@@ -129,8 +128,7 @@ extension SubprocessWindowsTests {
         #expect(result.terminationStatus.isSuccess)
         #expect(
             result.standardOutput?
-                .trimmingCharacters(in: .whitespacesAndNewlines) ==
-            "\"\(message)\""
+                .trimmingCharacters(in: .whitespacesAndNewlines) == "\"\(message)\""
         )
     }
 }
@@ -163,15 +161,14 @@ extension SubprocessWindowsTests {
             self.cmdExe,
             arguments: ["/c", "echo %HOMEPATH%"],
             environment: .inherit.updating([
-                "HOMEPATH": "/my/new/home",
+                "HOMEPATH": "/my/new/home"
             ]),
             output: .string
         )
         #expect(result.terminationStatus.isSuccess)
         #expect(
             result.standardOutput?
-                .trimmingCharacters(in: .whitespacesAndNewlines) ==
-            "/my/new/home"
+                .trimmingCharacters(in: .whitespacesAndNewlines) == "/my/new/home"
         )
     }
 
@@ -183,11 +180,11 @@ extension SubprocessWindowsTests {
         let result = try await Subprocess.run(
             self.cmdExe,
             arguments: [
-                "/c", "set"
+                "/c", "set",
             ],
             environment: .custom([
                 "Path": "C:\\Windows\\system32;C:\\Windows",
-                "ComSpec": "C:\\Windows\\System32\\cmd.exe"
+                "ComSpec": "C:\\Windows\\System32\\cmd.exe",
             ]),
             output: .string
         )
@@ -219,8 +216,7 @@ extension SubprocessWindowsTests {
         // `PATH` that we set
         #expect(
             result.standardOutput?
-                .trimmingCharacters(in: .whitespacesAndNewlines) ==
-            workingDirectory
+                .trimmingCharacters(in: .whitespacesAndNewlines) == workingDirectory
         )
     }
 
@@ -243,8 +239,7 @@ extension SubprocessWindowsTests {
         let resultPath = result.standardOutput!
             .trimmingCharacters(in: .whitespacesAndNewlines)
         #expect(
-            FilePath(resultPath) ==
-            workingDirectory
+            FilePath(resultPath) == workingDirectory
         )
     }
 }
@@ -275,14 +270,15 @@ extension SubprocessWindowsTests {
             contentsOf: URL(filePath: theMysteriousIsland.string)
         )
         let text: FileDescriptor = try .open(
-            theMysteriousIsland, .readOnly
+            theMysteriousIsland,
+            .readOnly
         )
 
         let catResult = try await Subprocess.run(
             self.cmdExe,
             arguments: [
                 "/c",
-                "findstr x*"
+                "findstr x*",
             ],
             input: .fileDescriptor(text, closeAfterSpawningProcess: true),
             output: .data(limit: 2048 * 1024)
@@ -291,8 +287,7 @@ extension SubprocessWindowsTests {
         #expect(catResult.terminationStatus.isSuccess)
         // Make sure we read all bytes
         #expect(
-            catResult.standardOutput ==
-            expected
+            catResult.standardOutput == expected
         )
     }
 
@@ -308,7 +303,7 @@ extension SubprocessWindowsTests {
             self.cmdExe,
             arguments: [
                 "/c",
-                "findstr x*"
+                "findstr x*",
             ],
             input: .data(expected),
             output: .data(limit: 2048 * 1024),
@@ -317,8 +312,7 @@ extension SubprocessWindowsTests {
         #expect(catResult.terminationStatus.isSuccess)
         // Make sure we read all bytes
         #expect(
-            catResult.standardOutput ==
-            expected
+            catResult.standardOutput == expected
         )
     }
 
@@ -336,11 +330,11 @@ extension SubprocessWindowsTests {
             DispatchQueue.global().async {
                 var currentStart = 0
                 while currentStart + chunkSize < expected.count {
-                    continuation.yield(expected[currentStart ..< currentStart + chunkSize])
+                    continuation.yield(expected[currentStart..<currentStart + chunkSize])
                     currentStart += chunkSize
                 }
                 if expected.count - currentStart > 0 {
-                    continuation.yield(expected[currentStart ..< expected.count])
+                    continuation.yield(expected[currentStart..<expected.count])
                 }
                 continuation.finish()
             }
@@ -353,8 +347,7 @@ extension SubprocessWindowsTests {
         )
         #expect(catResult.terminationStatus.isSuccess)
         #expect(
-            catResult.standardOutput ==
-            expected
+            catResult.standardOutput == expected
         )
     }
 
@@ -397,11 +390,11 @@ extension SubprocessWindowsTests {
             DispatchQueue.global().async {
                 var currentStart = 0
                 while currentStart + chunkSize < expected.count {
-                    continuation.yield(expected[currentStart ..< currentStart + chunkSize])
+                    continuation.yield(expected[currentStart..<currentStart + chunkSize])
                     currentStart += chunkSize
                 }
                 if expected.count - currentStart > 0 {
-                    continuation.yield(expected[currentStart ..< expected.count])
+                    continuation.yield(expected[currentStart..<expected.count])
                 }
                 continuation.finish()
             }
@@ -424,7 +417,6 @@ extension SubprocessWindowsTests {
         #expect(result.value == expected)
     }
 }
-
 
 // MARK: - Output Tests
 extension SubprocessWindowsTests {
@@ -460,7 +452,7 @@ extension SubprocessWindowsTests {
         let output = try #require(
             echoResult.standardOutput
         ).trimmingCharacters(in: .whitespacesAndNewlines)
-        let targetRange = expected.startIndex ..< expected.index(expected.startIndex, offsetBy: limit)
+        let targetRange = expected.startIndex..<expected.index(expected.startIndex, offsetBy: limit)
         #expect(String(expected[targetRange]) == output)
     }
 
@@ -560,8 +552,7 @@ extension SubprocessWindowsTests {
                 return
             }
             #expect(
-                userInfo[1].lowercased() ==
-                username.lowercased()
+                userInfo[1].lowercased() == username.lowercased()
             )
         }
     }
@@ -575,7 +566,7 @@ extension SubprocessWindowsTests {
             .path("C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe"),
             arguments: [
                 "-File", windowsTester.string,
-                "-mode", "get-console-window"
+                "-mode", "get-console-window",
             ],
             output: .string
         )
@@ -585,8 +576,7 @@ extension SubprocessWindowsTests {
         ).trimmingCharacters(in: .whitespacesAndNewlines)
         // Make sure the child console is same as parent
         #expect(
-            "\(intptr_t(bitPattern: parentConsole))" ==
-            sameConsoleValue
+            "\(intptr_t(bitPattern: parentConsole))" == sameConsoleValue
         )
         // Now launch a procss with new console
         var platformOptions: Subprocess.PlatformOptions = .init()
@@ -595,7 +585,7 @@ extension SubprocessWindowsTests {
             .path("C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe"),
             arguments: [
                 "-File", windowsTester.string,
-                "-mode", "get-console-window"
+                "-mode", "get-console-window",
             ],
             platformOptions: platformOptions,
             output: .string
@@ -606,8 +596,7 @@ extension SubprocessWindowsTests {
         ).trimmingCharacters(in: .whitespacesAndNewlines)
         // Make sure the child console is different from parent
         #expect(
-            "\(intptr_t(bitPattern: parentConsole))" ==
-            differentConsoleValue
+            "\(intptr_t(bitPattern: parentConsole))" == differentConsoleValue
         )
     }
 
@@ -621,7 +610,7 @@ extension SubprocessWindowsTests {
             .path("C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe"),
             arguments: [
                 "-File", windowsTester.string,
-                "-mode", "get-console-window"
+                "-mode", "get-console-window",
             ],
             platformOptions: platformOptions,
             output: .string
@@ -648,7 +637,7 @@ extension SubprocessWindowsTests {
             .path("C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe"),
             arguments: [
                 "-File", windowsTester.string,
-                "-mode", "get-console-window"
+                "-mode", "get-console-window",
             ],
             platformOptions: platformOptions,
             output: .string
@@ -659,8 +648,7 @@ extension SubprocessWindowsTests {
         ).trimmingCharacters(in: .whitespacesAndNewlines)
         // Make sure the child console is different from parent
         #expect(
-            "\(intptr_t(bitPattern: parentConsole))" !=
-            newConsoleValue
+            "\(intptr_t(bitPattern: parentConsole))" != newConsoleValue
         )
 
         guard !Self.hasAdminPrivileges() else {
@@ -736,7 +724,7 @@ extension SubprocessWindowsTests {
                 arguments: [
                     "-File", windowsTester.string,
                     "-mode", "is-process-suspended",
-                    "-processID", "\(subprocess.processIdentifier.value)"
+                    "-processID", "\(subprocess.processIdentifier.value)",
                 ],
                 output: .string
             )
@@ -753,7 +741,7 @@ extension SubprocessWindowsTests {
                 arguments: [
                     "-File", windowsTester.string,
                     "-mode", "is-process-suspended",
-                    "-processID", "\(subprocess.processIdentifier.value)"
+                    "-processID", "\(subprocess.processIdentifier.value)",
                 ],
                 output: .string
             )
@@ -782,22 +770,24 @@ extension SubprocessWindowsTests {
         let pid = try Subprocess.runDetached(
             .path("C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe"),
             arguments: [
-                "-Command", "Write-Host $PID"
+                "-Command", "Write-Host $PID",
             ],
             output: writeFd
         )
         // Wait for procss to finish
-        guard let processHandle = OpenProcess(
-            DWORD(PROCESS_QUERY_INFORMATION | SYNCHRONIZE),
-            false,
-            pid.value
-        ) else {
+        guard
+            let processHandle = OpenProcess(
+                DWORD(PROCESS_QUERY_INFORMATION | SYNCHRONIZE),
+                false,
+                pid.value
+            )
+        else {
             Issue.record("Failed to get process handle")
             return
         }
 
         // Wait for the process to finish
-        WaitForSingleObject(processHandle, INFINITE);
+        WaitForSingleObject(processHandle, INFINITE)
 
         let data = try await readFd.readUntilEOF(upToLength: 5)
         let resultPID = try #require(
@@ -870,14 +860,21 @@ extension SubprocessWindowsTests {
         var adminGroup: PSID? = nil
         // SECURITY_NT_AUTHORITY
         var netAuthority = SID_IDENTIFIER_AUTHORITY(Value: (0, 0, 0, 0, 0, 5))
-        guard AllocateAndInitializeSid(
-            &netAuthority,
-            2,  // nSubAuthorityCount
-            DWORD(SECURITY_BUILTIN_DOMAIN_RID),
-            DWORD(DOMAIN_ALIAS_RID_ADMINS),
-            0, 0, 0, 0, 0, 0,
-            &adminGroup
-        ) else {
+        guard
+            AllocateAndInitializeSid(
+                &netAuthority,
+                2,  // nSubAuthorityCount
+                DWORD(SECURITY_BUILTIN_DOMAIN_RID),
+                DWORD(DOMAIN_ALIAS_RID_ADMINS),
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                &adminGroup
+            )
+        else {
             return false
         }
         defer {
@@ -885,11 +882,13 @@ extension SubprocessWindowsTests {
         }
         // Check if the current process's token is part of
         // the Administrators group
-        guard CheckTokenMembership(
-            nil,
-            adminGroup,
-            &isAdmin
-        ) else {
+        guard
+            CheckTokenMembership(
+                nil,
+                adminGroup,
+                &isAdmin
+            )
+        else {
             return false
         }
         // Okay the below is intentional because
@@ -905,7 +904,7 @@ extension FileDescriptor {
             DispatchQueue.global(qos: .userInitiated).async {
                 var totalBytesRead: Int = 0
                 var lastError: DWORD? = nil
-                let values = Array<UInt8>(
+                let values = [UInt8](
                     unsafeUninitializedCapacity: maxLength
                 ) { buffer, initializedCount in
                     while true {
@@ -959,4 +958,4 @@ extension FileDescriptor {
     }
 }
 
-#endif // canImport(WinSDK)
+#endif  // canImport(WinSDK)

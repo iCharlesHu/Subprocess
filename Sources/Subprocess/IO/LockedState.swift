@@ -10,7 +10,6 @@
 //
 //===----------------------------------------------------------------------===//
 
-
 #if canImport(os)
 internal import os
 #if canImport(C.os.lock)
@@ -30,69 +29,69 @@ internal struct LockedState<State> {
 
     // Internal implementation for a cheap lock to aid sharing code across platforms
     private struct _Lock {
-#if canImport(os)
+        #if canImport(os)
         typealias Primitive = os_unfair_lock
-#elseif os(FreeBSD)
+        #elseif os(FreeBSD)
         typealias Primitive = pthread_mutex_t?
-#elseif canImport(Bionic) || canImport(Glibc) || canImport(Musl)
+        #elseif canImport(Bionic) || canImport(Glibc) || canImport(Musl)
         typealias Primitive = pthread_mutex_t
-#elseif canImport(WinSDK)
+        #elseif canImport(WinSDK)
         typealias Primitive = SRWLOCK
-#elseif os(WASI)
+        #elseif os(WASI)
         // WASI is single-threaded, so we don't need a lock.
         typealias Primitive = Void
-#endif
+        #endif
 
         typealias PlatformLock = UnsafeMutablePointer<Primitive>
         var _platformLock: PlatformLock
 
         fileprivate static func initialize(_ platformLock: PlatformLock) {
-#if canImport(os)
+            #if canImport(os)
             platformLock.initialize(to: os_unfair_lock())
-#elseif canImport(Bionic) || canImport(Glibc) || canImport(Musl)
+            #elseif canImport(Bionic) || canImport(Glibc) || canImport(Musl)
             pthread_mutex_init(platformLock, nil)
-#elseif canImport(WinSDK)
+            #elseif canImport(WinSDK)
             InitializeSRWLock(platformLock)
-#elseif os(WASI)
+            #elseif os(WASI)
             // no-op
-#else
-#error("LockedState._Lock.initialize is unimplemented on this platform")
-#endif
+            #else
+            #error("LockedState._Lock.initialize is unimplemented on this platform")
+            #endif
         }
 
         fileprivate static func deinitialize(_ platformLock: PlatformLock) {
-#if canImport(Bionic) || canImport(Glibc) || canImport(Musl)
+            #if canImport(Bionic) || canImport(Glibc) || canImport(Musl)
             pthread_mutex_destroy(platformLock)
-#endif
+            #endif
             platformLock.deinitialize(count: 1)
         }
 
         static fileprivate func lock(_ platformLock: PlatformLock) {
-#if canImport(os)
+            #if canImport(os)
             os_unfair_lock_lock(platformLock)
-#elseif canImport(Bionic) || canImport(Glibc) || canImport(Musl)
+            #elseif canImport(Bionic) || canImport(Glibc) || canImport(Musl)
             pthread_mutex_lock(platformLock)
-#elseif canImport(WinSDK)
+            #elseif canImport(WinSDK)
             AcquireSRWLockExclusive(platformLock)
-#elseif os(WASI)
+            #elseif os(WASI)
             // no-op
-#else
-#error("LockedState._Lock.lock is unimplemented on this platform")
-#endif
+            #else
+            #error("LockedState._Lock.lock is unimplemented on this platform")
+            #endif
         }
 
         static fileprivate func unlock(_ platformLock: PlatformLock) {
-#if canImport(os)
+            #if canImport(os)
             os_unfair_lock_unlock(platformLock)
-#elseif canImport(Bionic) || canImport(Glibc) || canImport(Musl)
+            #elseif canImport(Bionic) || canImport(Glibc) || canImport(Musl)
             pthread_mutex_unlock(platformLock)
-#elseif canImport(WinSDK)
+            #elseif canImport(WinSDK)
             ReleaseSRWLockExclusive(platformLock)
-#elseif os(WASI)
+            #elseif os(WASI)
             // no-op
-#else
-#error("LockedState._Lock.unlock is unimplemented on this platform")
-#endif
+            #else
+            #error("LockedState._Lock.unlock is unimplemented on this platform")
+            #endif
         }
     }
 
@@ -107,12 +106,15 @@ internal struct LockedState<State> {
     private let _buffer: ManagedBuffer<State, _Lock.Primitive>
 
     internal init(_ initialState: State) {
-        _buffer = _Buffer.create(minimumCapacity: 1, makingHeaderWith: { buf in
-            buf.withUnsafeMutablePointerToElements {
-                _Lock.initialize($0)
+        _buffer = _Buffer.create(
+            minimumCapacity: 1,
+            makingHeaderWith: { buf in
+                buf.withUnsafeMutablePointerToElements {
+                    _Lock.initialize($0)
+                }
+                return initialState
             }
-            return initialState
-        })
+        )
     }
 
     internal func withLock<T>(_ body: @Sendable (inout State) throws -> T) rethrows -> T {
@@ -164,4 +166,3 @@ extension LockedState where State == Void {
 }
 
 extension LockedState: @unchecked Sendable where State: Sendable {}
-
