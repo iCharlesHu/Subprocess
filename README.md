@@ -77,7 +77,7 @@ let result = try await run(
             await execution.teardown(
                 using: [
                     .gracefulShutDown(
-                        alloweDurationToNextStep: .seconds(0.5)
+                        allowedDurationToNextStep: .seconds(0.5)
                     )
                 ]
             )

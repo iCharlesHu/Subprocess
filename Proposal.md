@@ -103,7 +103,7 @@
     - Revise `InputProtocol` and `OutputProtocol` to not expose `FileDescriptor` directly
     - Added `SubprocessSpan` trait
     - Removed the opaque `Pipe`
-    - Introduce a cross platform TeardownStep.gracefulShutDown(alloweDurationToNextStep:) and add Windows support
+    - Introduce a cross platform TeardownStep.gracefulShutDown(allowedDurationToNextStep:) and add Windows support
 
 ## Introduction
 
@@ -653,7 +653,7 @@ public struct TeardownStep: Sendable, Hashable {
 #endif
 
     /// Attempt to perform a graceful shutdown and allows
-    /// `alloweDurationToNextStep` for the process to exit
+    /// `allowedDurationToNextStep` for the process to exit
     /// before proceeding to the next step:
     /// - On Unix: send `SIGTERM`
     /// - On Windows:
@@ -661,7 +661,7 @@ public struct TeardownStep: Sendable, Hashable {
     ///   2. Attempt to send `CTRL_C_EVENT` to console;
     ///   3. Attempt to send `CTRL_BREAK_EVENT` to process group.
     public static func gracefulShutDown(
-        alloweDurationToNextStep: Duration
+        allowedDurationToNextStep: Duration
     ) -> Self
 }
 
