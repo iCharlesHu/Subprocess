@@ -144,7 +144,6 @@ extension Configuration {
         error: Error,
         errorPipe: CreatedPipe
     ) throws -> Execution<Output, Error> {
-
         // Instead of checking if every possible executable path
         // is valid, spawn each directly and catch ENOENT
         let possiblePaths = self.executable.possibleExecutablePaths(
@@ -327,7 +326,11 @@ extension Configuration {
                     continue
                 }
                 // Throw all other errors
-                try self.cleanupPreSpawn(input: inputPipe, output: outputPipe, error: errorPipe)
+                try self.cleanupPreSpawn(
+                    input: inputPipe,
+                    output: outputPipe,
+                    error: errorPipe
+                )
                 throw SubprocessError(
                     code: .init(.spawnFailed),
                     underlyingError: .init(rawValue: spawnError)

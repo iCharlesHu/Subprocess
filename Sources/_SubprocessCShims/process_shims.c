@@ -10,6 +10,12 @@
 //===----------------------------------------------------------------------===//
 
 #include "include/target_conditionals.h"
+
+#if TARGET_OS_LINUX
+// For posix_spawn_file_actions_addchdir_np
+#define _GNU_SOURCE 1
+#endif
+
 #include "include/process_shims.h"
 
 #if !TARGET_OS_WINDOWS
@@ -145,19 +151,28 @@ static int _subprocess_spawn_prefork(
         // Perform setups
         if (number_of_sgroups > 0 && sgroups != NULL) {
             if (setgroups(number_of_sgroups, sgroups) != 0) {
-                return errno;
+                int error =  errno;
+                write(pipefd[1], &error, sizeof(error));
+                close(pipefd[1]);
+                _exit(EXIT_FAILURE);
             }
         }
 
         if (uid != NULL) {
             if (setuid(*uid) != 0) {
-                return errno;
+                int error =  errno;
+                write(pipefd[1], &error, sizeof(error));
+                close(pipefd[1]);
+                _exit(EXIT_FAILURE);
             }
         }
 
         if (gid != NULL) {
             if (setgid(*gid) != 0) {
-                return errno;
+                int error =  errno;
+                write(pipefd[1], &error, sizeof(error));
+                close(pipefd[1]);
+                _exit(EXIT_FAILURE);
             }
         }
 
@@ -226,8 +241,66 @@ int _subprocess_spawn(
 #endif // TARGET_OS_MAC
 
 // MARK: - Linux (fork/exec + posix_spawn fallback)
+#if TARGET_OS_LINUX
 
 #if _POSIX_SPAWN
+static int _subprocess_is_addchdir_np_available() {
+#if defined(__GLIBC__) && !__GLIBC_PREREQ(2, 29)
+    // Glibc versions prior to 2.29 don't support posix_spawn_file_actions_addchdir_np, impacting:
+    //  - Amazon Linux 2 (EoL mid-2025)
+    return 0;
+#elif defined(__OpenBSD__) || defined(__QNX__)
+    // Currently missing as of:
+    //  - OpenBSD 7.5 (April 2024)
+    //  - QNX 8 (December 2023)
+    return 0;
+#elif defined(__GLIBC__) || TARGET_OS_DARWIN || defined(__FreeBSD__) || (defined(__ANDROID__) && __ANDROID_API__ >= 34) || defined(__musl__)
+    // Pre-standard posix_spawn_file_actions_addchdir_np version available in:
+    //  - Solaris 11.3 (October 2015)
+    //  - Glibc 2.29 (February 2019)
+    //  - macOS 10.15 (October 2019)
+    //  - musl 1.1.24 (October 2019)
+    //  - FreeBSD 13.1 (May 2022)
+    //  - Android 14 (October 2023)
+    return 1;
+#else
+    // Standardized posix_spawn_file_actions_addchdir version (POSIX.1-2024, June 2024) available in:
+    //  - Solaris 11.4 (August 2018)
+    //  - NetBSD 10.0 (March 2024)
+    return 1;
+#endif
+}
+
+static int _subprocess_addchdir_np(
+    posix_spawn_file_actions_t *file_actions,
+    const char * __restrict path
+) {
+#if defined(__GLIBC__) && !__GLIBC_PREREQ(2, 29)
+    // Glibc versions prior to 2.29 don't support posix_spawn_file_actions_addchdir_np, impacting:
+    //  - Amazon Linux 2 (EoL mid-2025)
+    // noop
+#elif defined(__OpenBSD__) || defined(__QNX__)
+    // Currently missing as of:
+    //  - OpenBSD 7.5 (April 2024)
+    //  - QNX 8 (December 2023)
+    // noop
+#elif defined(__GLIBC__) || TARGET_OS_DARWIN || defined(__FreeBSD__) || (defined(__ANDROID__) && __ANDROID_API__ >= 34) || defined(__musl__)
+    // Pre-standard posix_spawn_file_actions_addchdir_np version available in:
+    //  - Solaris 11.3 (October 2015)
+    //  - Glibc 2.29 (February 2019)
+    //  - macOS 10.15 (October 2019)
+    //  - musl 1.1.24 (October 2019)
+    //  - FreeBSD 13.1 (May 2022)
+    //  - Android 14 (October 2023)
+    return posix_spawn_file_actions_addchdir_np(file_actions, path);
+#else
+    // Standardized posix_spawn_file_actions_addchdir version (POSIX.1-2024, June 2024) available in:
+    //  - Solaris 11.4 (August 2018)
+    //  - NetBSD 10.0 (March 2024)
+    return posix_spawn_file_actions_addchdir(file_actions, path);
+#endif
+}
+
 static int _subprocess_posix_spawn_fallback(
     pid_t * _Nonnull pid,
     const char * _Nonnull exec_path,
@@ -259,6 +332,11 @@ static int _subprocess_posix_spawn_fallback(
             &file_actions, file_descriptors[4], STDERR_FILENO
         );
         if (rc != 0) { return rc; }
+    }
+    // Setup working directory
+    rc = _subprocess_addchdir_np(&file_actions, working_directory);
+    if (rc != 0) {
+        return rc;
     }
 
     // Close parent side
@@ -323,7 +401,7 @@ int _subprocess_fork_exec(
     int create_session,
     void (* _Nullable configurator)(void)
 ) {
-    int require_pre_fork = working_directory != NULL ||
+    int require_pre_fork = _subprocess_is_addchdir_np_available() == 0 ||
         uid != NULL ||
         gid != NULL ||
         process_group_id != NULL ||
@@ -349,81 +427,176 @@ int _subprocess_fork_exec(
     }
 #endif
 
-    pid_t child_pid = fork();
-    if (child_pid != 0) {
-        *pid = child_pid;
-        return child_pid < 0 ? errno : 0;
-    }
-
-    if (working_directory != NULL) {
-        if (chdir(working_directory) != 0) {
-            return errno;
-        }
-    }
-
-
-    if (uid != NULL) {
-        if (setuid(*uid) != 0) {
-            return errno;
-        }
-    }
-
-    if (gid != NULL) {
-        if (setgid(*gid) != 0) {
-            return errno;
-        }
-    }
-
-    if (number_of_sgroups > 0 && sgroups != NULL) {
-        if (setgroups(number_of_sgroups, sgroups) != 0) {
-            return errno;
-        }
-    }
-
-    if (create_session != 0) {
-        (void)setsid();
-    }
-
-    if (process_group_id != NULL) {
-        (void)setpgid(0, *process_group_id);
-    }
-
-    // Bind stdin, stdout, and stderr
-    int rc = 0;
-    if (file_descriptors[0] >= 0) {
-        rc = dup2(file_descriptors[0], STDIN_FILENO);
-        if (rc < 0) { return errno; }
-    }
-    if (file_descriptors[2] >= 0) {
-        rc = dup2(file_descriptors[2], STDOUT_FILENO);
-        if (rc < 0) { return errno; }
-    }
-    if (file_descriptors[4] >= 0) {
-        rc = dup2(file_descriptors[4], STDERR_FILENO);
-        if (rc < 0) { return errno; }
-    }
-    // Close parent side
-    if (file_descriptors[1] >= 0) {
-        rc = close(file_descriptors[1]);
-    }
-    if (file_descriptors[3] >= 0) {
-        rc = close(file_descriptors[3]);
-    }
-    if (file_descriptors[4] >= 0) {
-        rc = close(file_descriptors[5]);
-    }
-    if (rc != 0) {
+    // Setup pipe to catch exec failures from child
+    int pipefd[2];
+    if (pipe(pipefd) != 0) {
         return errno;
     }
-    // Run custom configuratior
-    if (configurator != NULL) {
-        configurator();
+    // Set FD_CLOEXEC so the pipe is automatically closed when exec succeeds
+    short flags = fcntl(pipefd[0], F_GETFD);
+    if (flags == -1) {
+        close(pipefd[0]);
+        close(pipefd[1]);
+        return errno;
     }
-    // Finally, exec
-    execve(exec_path, args, env);
-    // If we got here, something went wrong
-    return errno;
+    flags |= FD_CLOEXEC;
+    if (fcntl(pipefd[0], F_SETFD, flags) == -1) {
+        close(pipefd[0]);
+        close(pipefd[1]);
+        return errno;
+    }
+
+    flags = fcntl(pipefd[1], F_GETFD);
+    if (flags == -1) {
+        close(pipefd[0]);
+        close(pipefd[1]);
+        return errno;
+    }
+    flags |= FD_CLOEXEC;
+    if (fcntl(pipefd[1], F_SETFD, flags) == -1) {
+        close(pipefd[0]);
+        close(pipefd[1]);
+        return errno;
+    }
+
+    // Finally, fork
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wdeprecated"
+    pid_t childPid = fork();
+#pragma GCC diagnostic pop
+    if (childPid == -1) {
+        close(pipefd[0]);
+        close(pipefd[1]);
+        return errno;
+    }
+
+    if (childPid == 0) {
+        // Child process
+        close(pipefd[0]);  // Close unused read end
+
+        // Perform setups
+        if (working_directory != NULL) {
+            if (chdir(working_directory) != 0) {
+                int error =  errno;
+                write(pipefd[1], &error, sizeof(error));
+                close(pipefd[1]);
+                _exit(EXIT_FAILURE);
+            }
+        }
+
+
+        if (uid != NULL) {
+            if (setuid(*uid) != 0) {
+                int error =  errno;
+                write(pipefd[1], &error, sizeof(error));
+                close(pipefd[1]);
+                _exit(EXIT_FAILURE);
+            }
+        }
+
+        if (gid != NULL) {
+            if (setgid(*gid) != 0) {
+                int error =  errno;
+                write(pipefd[1], &error, sizeof(error));
+                close(pipefd[1]);
+                _exit(EXIT_FAILURE);
+            }
+        }
+
+        if (number_of_sgroups > 0 && sgroups != NULL) {
+            if (setgroups(number_of_sgroups, sgroups) != 0) {
+                int error = errno;
+                write(pipefd[1], &error, sizeof(error));
+                close(pipefd[1]);
+                _exit(EXIT_FAILURE);
+            }
+        }
+
+        if (create_session != 0) {
+            (void)setsid();
+        }
+
+        if (process_group_id != NULL) {
+            (void)setpgid(0, *process_group_id);
+        }
+
+        // Bind stdin, stdout, and stderr
+        int rc = 0;
+        if (file_descriptors[0] >= 0) {
+            rc = dup2(file_descriptors[0], STDIN_FILENO);
+            if (rc < 0) {
+                int error = errno;
+                write(pipefd[1], &error, sizeof(error));
+                close(pipefd[1]);
+                _exit(EXIT_FAILURE);
+            }
+        }
+        if (file_descriptors[2] >= 0) {
+            rc = dup2(file_descriptors[2], STDOUT_FILENO);
+            if (rc < 0) {
+                int error = errno;
+                write(pipefd[1], &error, sizeof(error));
+                close(pipefd[1]);
+                _exit(EXIT_FAILURE);
+            }
+        }
+        if (file_descriptors[4] >= 0) {
+            rc = dup2(file_descriptors[4], STDERR_FILENO);
+            if (rc < 0) {
+                int error = errno;
+                write(pipefd[1], &error, sizeof(error));
+                close(pipefd[1]);
+                _exit(EXIT_FAILURE);
+            }
+        }
+        // Close parent side
+        if (file_descriptors[1] >= 0) {
+            rc = close(file_descriptors[1]);
+        }
+        if (file_descriptors[3] >= 0) {
+            rc = close(file_descriptors[3]);
+        }
+        if (file_descriptors[4] >= 0) {
+            rc = close(file_descriptors[5]);
+        }
+        if (rc != 0) {
+            int error = errno;
+            write(pipefd[1], &error, sizeof(error));
+            close(pipefd[1]);
+            _exit(EXIT_FAILURE);
+        }
+        // Run custom configuratior
+        if (configurator != NULL) {
+            configurator();
+        }
+        // Finally, exec
+        execve(exec_path, args, env);
+        // If we reached this point, something went wrong
+        int error = errno;
+        write(pipefd[1], &error, sizeof(error));
+        close(pipefd[1]);
+        _exit(EXIT_FAILURE);
+    } else {
+        // Parent process
+        close(pipefd[1]);  // Close unused write end
+        // Communicate child pid back
+        *pid = childPid;
+        // Read from the pipe until pipe is closed
+        // Eitehr due to exec succeeds or error is written
+        int childError = 0;
+        if (read(pipefd[0], &childError, sizeof(childError)) > 0) {
+            // We encountered error
+            close(pipefd[0]);
+            return childError;
+        } else {
+            // Child process exec was successful
+            close(pipefd[0]);
+            return 0;
+        }
+    }
 }
+
+#endif // TARGET_OS_LINUX
 
 #endif // !TARGET_OS_WINDOWS
 
