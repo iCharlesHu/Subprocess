@@ -21,6 +21,7 @@
 #include <sys/wait.h>
 #include <signal.h>
 #include <string.h>
+#include <fcntl.h>
 
 #include <stdio.h>
 
@@ -69,8 +70,7 @@ int _shims_snprintf(
 
 // MARK: - Darwin (posix_spawn)
 #if TARGET_OS_MAC
-
-int _subprocess_spawn(
+static int _subprocess_spawn_prefork(
     pid_t  * _Nonnull  pid,
     const char  * _Nonnull  exec_path,
     const posix_spawn_file_actions_t _Nullable * _Nonnull file_actions,
@@ -82,21 +82,67 @@ int _subprocess_spawn(
     int number_of_sgroups, const gid_t * _Nullable sgroups,
     int create_session
 ) {
-    int require_pre_fork = uid != NULL ||
-    gid != NULL ||
-    number_of_sgroups > 0 ||
-    create_session > 0;
+    // Set `POSIX_SPAWN_SETEXEC` flag since we are forking ourselves
+    short flags = 0;
+    int rc = posix_spawnattr_getflags(spawn_attrs, &flags);
+    if (rc != 0) {
+        return rc;
+    }
 
-    if (require_pre_fork != 0) {
+    rc = posix_spawnattr_setflags(
+        (posix_spawnattr_t *)spawn_attrs, flags | POSIX_SPAWN_SETEXEC
+    );
+    if (rc != 0) {
+        return rc;
+    }
+    // Setup pipe to catch exec failures from child
+    int pipefd[2];
+    if (pipe(pipefd) != 0) {
+        return errno;
+    }
+    // Set FD_CLOEXEC so the pipe is automatically closed when exec succeeds
+    flags = fcntl(pipefd[0], F_GETFD);
+    if (flags == -1) {
+        close(pipefd[0]);
+        close(pipefd[1]);
+        return errno;
+    }
+    flags |= FD_CLOEXEC;
+    if (fcntl(pipefd[0], F_SETFD, flags) == -1) {
+        close(pipefd[0]);
+        close(pipefd[1]);
+        return errno;
+    }
+
+    flags = fcntl(pipefd[1], F_GETFD);
+    if (flags == -1) {
+        close(pipefd[0]);
+        close(pipefd[1]);
+        return errno;
+    }
+    flags |= FD_CLOEXEC;
+    if (fcntl(pipefd[1], F_SETFD, flags) == -1) {
+        close(pipefd[0]);
+        close(pipefd[1]);
+        return errno;
+    }
+
+    // Finally, fork
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wdeprecated"
-        pid_t childPid = vfork();
+    pid_t childPid = fork();
 #pragma GCC diagnostic pop
-        if (childPid != 0) {
-            *pid = childPid;
-            return childPid < 0 ? errno : 0;
-        }
+    if (childPid == -1) {
+        close(pipefd[0]);
+        close(pipefd[1]);
+        return errno;
+    }
 
+    if (childPid == 0) {
+        // Child process
+        close(pipefd[0]);  // Close unused read end
+
+        // Perform setups
         if (number_of_sgroups > 0 && sgroups != NULL) {
             if (setgroups(number_of_sgroups, sgroups) != 0) {
                 return errno;
@@ -118,22 +164,59 @@ int _subprocess_spawn(
         if (create_session != 0) {
             (void)setsid();
         }
+
+        // Use posix_spawnas exec
+        int error = posix_spawn(pid, exec_path, file_actions, spawn_attrs, args, env);
+        // If we reached this point, something went wrong
+        write(pipefd[1], &error, sizeof(error));
+        close(pipefd[1]);
+        _exit(EXIT_FAILURE);
+    } else {
+        // Parent process
+        close(pipefd[1]);  // Close unused write end
+        // Communicate child pid back
+        *pid = childPid;
+        // Read from the pipe until pipe is closed
+        // Eitehr due to exec succeeds or error is written
+        int childError = 0;
+        if (read(pipefd[0], &childError, sizeof(childError)) > 0) {
+            // We encountered error
+            close(pipefd[0]);
+            return childError;
+        } else {
+            // Child process exec was successful
+            close(pipefd[0]);
+            return 0;
+        }
     }
+}
 
-    // Set POSIX_SPAWN_SETEXEC if we already forked
-    if (require_pre_fork) {
-        short flags = 0;
-        int rc = posix_spawnattr_getflags(spawn_attrs, &flags);
-        if (rc != 0) {
-            return rc;
-        }
+int _subprocess_spawn(
+    pid_t  * _Nonnull  pid,
+    const char  * _Nonnull  exec_path,
+    const posix_spawn_file_actions_t _Nullable * _Nonnull file_actions,
+    const posix_spawnattr_t _Nullable * _Nonnull spawn_attrs,
+    char * _Nullable const args[_Nonnull],
+    char * _Nullable const env[_Nullable],
+    uid_t * _Nullable uid,
+    gid_t * _Nullable gid,
+    int number_of_sgroups, const gid_t * _Nullable sgroups,
+    int create_session
+) {
+    int require_pre_fork = uid != NULL ||
+        gid != NULL ||
+        number_of_sgroups > 0 ||
+        create_session > 0;
 
-        rc = posix_spawnattr_setflags(
-            (posix_spawnattr_t *)spawn_attrs, flags | POSIX_SPAWN_SETEXEC
+    if (require_pre_fork != 0) {
+        int rc = _subprocess_spawn_prefork(
+            pid,
+            exec_path,
+            file_actions, spawn_attrs,
+            args, env,
+            uid, gid, number_of_sgroups, sgroups, create_session
         );
-        if (rc != 0) {
-            return rc;
-        }
+        return rc;
     }
 
     // Spawn

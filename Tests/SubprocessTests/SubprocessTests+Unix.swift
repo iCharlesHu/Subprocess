@@ -96,17 +96,14 @@ extension SubprocessUnixTests {
             return
         }
         do {
-            // Since we are using the path directly,
-            // we expect the error to be thrown by the underlying
-            // posix_spawn
             _ = try await Subprocess.run(.path("/usr/bin/do-not-exist"))
-            Issue.record("Expected to throw POSIXError")
+            Issue.record("Expected to throw SubprocessError")
         } catch {
             guard let subprocessError: SubprocessError = error as? SubprocessError else {
-                Issue.record("Expected POSIXError, got \(error)")
+                Issue.record("Expected SubprocessError, got \(error)")
                 return
             }
-            #expect(subprocessError.code == .init(.spawnFailed))
+            #expect(subprocessError.code == .init(.executableNotFound("/usr/bin/do-not-exist")))
         }
     }
 }

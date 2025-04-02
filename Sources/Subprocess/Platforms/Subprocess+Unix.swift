@@ -321,40 +321,13 @@ extension Executable {
 // MARK: - PreSpawn
 extension Configuration {
     internal func preSpawn() throws -> (
-        executablePath: String,
         env: [UnsafeMutablePointer<CChar>?],
-        argv: [UnsafeMutablePointer<CChar>?],
-        intendedWorkingDir: FilePath,
         uidPtr: UnsafeMutablePointer<uid_t>?,
         gidPtr: UnsafeMutablePointer<gid_t>?,
         supplementaryGroups: [gid_t]?
     ) {
         // Prepare environment
         let env = self.environment.createEnv()
-        // Prepare executable path
-        let executablePath: String
-        do {
-            executablePath = try self.executable.resolveExecutablePath(
-                withPathValue: self.environment.pathValue()
-            )
-        } catch {
-            for ptr in env { ptr?.deallocate() }
-            throw error
-        }
-        // Prepare arguments
-        let argv: [UnsafeMutablePointer<CChar>?] = self.arguments.createArgs(withExecutablePath: executablePath)
-        // Prepare workingDir
-        let intendedWorkingDir = self.workingDirectory
-        guard Self.pathAccessible(intendedWorkingDir.string, mode: F_OK) else {
-            for ptr in env { ptr?.deallocate() }
-            for ptr in argv { ptr?.deallocate() }
-            throw SubprocessError(
-                code: .init(
-                    .failedToChangeWorkingDirectory(intendedWorkingDir.string)
-                ),
-                underlyingError: nil
-            )
-        }
 
         var uidPtr: UnsafeMutablePointer<uid_t>? = nil
         if let userID = self.platformOptions.userID {
@@ -371,10 +344,9 @@ extension Configuration {
             supplementaryGroups = groupsValue
         }
         return (
-            executablePath: executablePath,
-            env: env, argv: argv,
-            intendedWorkingDir: intendedWorkingDir,
-            uidPtr: uidPtr, gidPtr: gidPtr,
+            env: env,
+            uidPtr: uidPtr,
+            gidPtr: gidPtr,
             supplementaryGroups: supplementaryGroups
         )
     }
