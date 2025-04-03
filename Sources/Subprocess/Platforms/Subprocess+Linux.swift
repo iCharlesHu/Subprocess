@@ -47,83 +47,115 @@ extension Configuration {
     ) throws -> Execution<Output, Error> {
         _setupMonitorSignalHandler()
 
-        let (
-            executablePath,
-            env, argv,
-            intendedWorkingDir,
-            uidPtr, gidPtr,
-            supplementaryGroups
-        ) = try self.preSpawn()
-        var processGroupIDPtr: UnsafeMutablePointer<gid_t>? = nil
-        if let processGroupID = self.platformOptions.processGroupID {
-            processGroupIDPtr = .allocate(capacity: 1)
-            processGroupIDPtr?.pointee = gid_t(processGroupID)
-        }
-        defer {
-            for ptr in env { ptr?.deallocate() }
-            for ptr in argv { ptr?.deallocate() }
-            uidPtr?.deallocate()
-            gidPtr?.deallocate()
-            processGroupIDPtr?.deallocate()
-        }
+        // Instead of checking if every possible executable path
+        // is valid, spawn each directly and catch ENOENT
+        let possiblePaths = self.executable.possibleExecutablePaths(
+            withPathValue: self.environment.pathValue()
+        )
 
-        let fileDescriptors: [CInt] = [
-            inputPipe.readFileDescriptor?.wrapped.rawValue ?? -1,
-            inputPipe.writeFileDescriptor?.wrapped.rawValue ?? -1,
-            outputPipe.writeFileDescriptor?.wrapped.rawValue ?? -1,
-            outputPipe.readFileDescriptor?.wrapped.rawValue ?? -1,
-            errorPipe.writeFileDescriptor?.wrapped.rawValue ?? -1,
-            errorPipe.readFileDescriptor?.wrapped.rawValue ?? -1,
-        ]
+        for possibleExecutablePath in possiblePaths {
+            let (
+                env,
+                uidPtr,
+                gidPtr,
+                supplementaryGroups
+            ) = try self.preSpawn()
+            var processGroupIDPtr: UnsafeMutablePointer<gid_t>? = nil
+            if let processGroupID = self.platformOptions.processGroupID {
+                processGroupIDPtr = .allocate(capacity: 1)
+                processGroupIDPtr?.pointee = gid_t(processGroupID)
+            }
+            defer {
+                for ptr in env { ptr?.deallocate() }
+                uidPtr?.deallocate()
+                gidPtr?.deallocate()
+                processGroupIDPtr?.deallocate()
+            }
+            // Setup Arguments
+            let argv: [UnsafeMutablePointer<CChar>?] = self.arguments.createArgs(
+                withExecutablePath: possibleExecutablePath
+            )
+            defer {
+                for ptr in argv { ptr?.deallocate() }
+            }
+            // Setup input
+            let fileDescriptors: [CInt] = [
+                inputPipe.readFileDescriptor?.wrapped.rawValue ?? -1,
+                inputPipe.writeFileDescriptor?.wrapped.rawValue ?? -1,
+                outputPipe.writeFileDescriptor?.wrapped.rawValue ?? -1,
+                outputPipe.readFileDescriptor?.wrapped.rawValue ?? -1,
+                errorPipe.writeFileDescriptor?.wrapped.rawValue ?? -1,
+                errorPipe.readFileDescriptor?.wrapped.rawValue ?? -1,
+            ]
 
-        var workingDirectory: String?
-        if intendedWorkingDir != FilePath.currentWorkingDirectory {
-            // Only pass in working directory if it's different
-            workingDirectory = intendedWorkingDir.string
-        }
-        // Spawn
-        var pid: pid_t = 0
-        let spawnError: CInt = executablePath.withCString { exePath in
-            return workingDirectory.withOptionalCString { workingDir in
-                return supplementaryGroups.withOptionalUnsafeBufferPointer { sgroups in
-                    return fileDescriptors.withUnsafeBufferPointer { fds in
-                        return _subprocess_fork_exec(
-                            &pid,
-                            exePath,
-                            workingDir,
-                            fds.baseAddress!,
-                            argv,
-                            env,
-                            uidPtr,
-                            gidPtr,
-                            processGroupIDPtr,
-                            CInt(supplementaryGroups?.count ?? 0),
-                            sgroups?.baseAddress,
-                            self.platformOptions.createSession ? 1 : 0,
-                            self.platformOptions.preSpawnProcessConfigurator
-                        )
+            let workingDirectory: String = self.workingDirectory.string
+            // Spawn
+            var pid: pid_t = 0
+            let spawnError: CInt = possibleExecutablePath.withCString { exePath in
+                return workingDirectory.withCString { workingDir in
+                    return supplementaryGroups.withOptionalUnsafeBufferPointer { sgroups in
+                        return fileDescriptors.withUnsafeBufferPointer { fds in
+                            return _subprocess_fork_exec(
+                                &pid,
+                                exePath,
+                                workingDir,
+                                fds.baseAddress!,
+                                argv,
+                                env,
+                                uidPtr,
+                                gidPtr,
+                                processGroupIDPtr,
+                                CInt(supplementaryGroups?.count ?? 0),
+                                sgroups?.baseAddress,
+                                self.platformOptions.createSession ? 1 : 0,
+                                self.platformOptions.preSpawnProcessConfigurator
+                            )
+                        }
                     }
                 }
             }
-        }
-        // Spawn error
-        if spawnError != 0 {
-            try self.cleanupPreSpawn(
-                input: inputPipe,
-                output: outputPipe,
-                error: errorPipe
+            // Spawn error
+            if spawnError != 0 {
+                if spawnError == ENOENT {
+                    // Move on to another possible path
+                    continue
+                }
+                // Throw all other errors
+                try self.cleanupPreSpawn(
+                    input: inputPipe,
+                    output: outputPipe,
+                    error: errorPipe
+                )
+                throw SubprocessError(
+                    code: .init(.spawnFailed),
+                    underlyingError: .init(rawValue: spawnError)
+                )
+            }
+            return Execution(
+                processIdentifier: .init(value: pid),
+                output: output,
+                error: error,
+                outputPipe: outputPipe,
+                errorPipe: errorPipe
             )
+        }
+
+        // If we reach this point, it means either the executable path
+        // or working directory is not valid. Since posix_spawn does not
+        // provide which one is not valid, here we make a best effort guess
+        // by checking whether the working directory is valid. This technically
+        // still causes TOUTOC issue, but it's the best we can do for error recovery.
+        try self.cleanupPreSpawn(input: inputPipe, output: outputPipe, error: errorPipe)
+        let workingDirectory = self.workingDirectory.string
+        guard Configuration.pathAccessible(workingDirectory, mode: F_OK) else {
             throw SubprocessError(
-                code: .init(.spawnFailed),
-                underlyingError: .init(rawValue: spawnError)
+                code: .init(.failedToChangeWorkingDirectory(workingDirectory)),
+                underlyingError: .init(rawValue: ENOENT)
             )
         }
-        return Execution(
-            processIdentifier: .init(value: pid),
-            output: output,
-            error: error,
-            outputPipe: outputPipe,
-            errorPipe: errorPipe
+        throw SubprocessError(
+            code: .init(.executableNotFound(self.executable.description)),
+            underlyingError: .init(rawValue: ENOENT)
         )
     }
 }
