@@ -41,6 +41,7 @@ let package = Package(
     traits: [
         "SubprocessFoundation",
         "SubprocessSpan",
+        "ContemporaryMacOS",
         .default(
             enabledTraits: defaultTraits
         ),

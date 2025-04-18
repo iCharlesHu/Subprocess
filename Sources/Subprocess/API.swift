@@ -33,6 +33,9 @@ import System
 #if SubprocessSpan
 @available(SubprocessSpan, *)
 #endif
+#if ContemporaryMacOS
+@available(macOS 15, *)
+#endif
 public func run<
     Input: InputProtocol,
     Output: OutputProtocol,
@@ -122,6 +125,9 @@ public func run<
 #if SubprocessSpan
 @available(SubprocessSpan, *)
 #endif
+#if ContemporaryMacOS
+@available(macOS 15, *)
+#endif
 public func run<Result, Input: InputProtocol, Output: OutputProtocol, Error: OutputProtocol>(
     _ executable: Executable,
     arguments: Arguments = [],
@@ -163,6 +169,9 @@ public func run<Result, Input: InputProtocol, Output: OutputProtocol, Error: Out
 #if SubprocessSpan
 @available(SubprocessSpan, *)
 #endif
+#if ContemporaryMacOS
+@available(macOS 15, *)
+#endif
 public func run<Result, Output: OutputProtocol, Error: OutputProtocol>(
     _ executable: Executable,
     arguments: Arguments = [],
@@ -196,6 +205,9 @@ public func run<Result, Output: OutputProtocol, Error: OutputProtocol>(
 /// - Returns a CollectedResult containing the result of the run.
 #if SubprocessSpan
 @available(SubprocessSpan, *)
+#endif
+#if ContemporaryMacOS
+@available(macOS 15, *)
 #endif
 public func run<
     Input: InputProtocol,
@@ -243,6 +255,9 @@ public func run<
 #if SubprocessSpan
 @available(SubprocessSpan, *)
 #endif
+#if ContemporaryMacOS
+@available(macOS 15, *)
+#endif
 public func run<Result, Output: OutputProtocol, Error: OutputProtocol>(
     _ configuration: Configuration,
     output: Output,
@@ -274,6 +289,9 @@ public func run<Result, Output: OutputProtocol, Error: OutputProtocol>(
 /// - Returns: the process identifier for the subprocess.
 #if SubprocessSpan
 @available(SubprocessSpan, *)
+#endif
+#if ContemporaryMacOS
+@available(macOS 15, *)
 #endif
 public func runDetached(
     _ executable: Executable,
@@ -310,6 +328,9 @@ public func runDetached(
 /// - Returns: the process identifier for the subprocess.
 #if SubprocessSpan
 @available(SubprocessSpan, *)
+#endif
+#if ContemporaryMacOS
+@available(macOS 15, *)
 #endif
 public func runDetached(
     _ configuration: Configuration,

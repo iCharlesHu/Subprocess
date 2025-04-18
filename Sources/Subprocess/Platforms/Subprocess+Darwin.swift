@@ -156,6 +156,9 @@ extension Configuration {
     #if SubprocessSpan
     @available(SubprocessSpan, *)
     #endif
+    #if ContemporaryMacOS
+    @available(macOS 15, *)
+    #endif
     internal func spawn<
         Output: OutputProtocol,
         Error: OutputProtocol

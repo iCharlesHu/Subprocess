@@ -111,6 +111,9 @@ extension ProcessIdentifier: CustomStringConvertible, CustomDebugStringConvertib
 #if SubprocessSpan
 @available(SubprocessSpan, *)
 #endif
+#if ContemporaryMacOS
+@available(macOS 15, *)
+#endif
 extension Execution {
     /// Send the given signal to the child process.
     /// - Parameters:

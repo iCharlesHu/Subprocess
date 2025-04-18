@@ -37,6 +37,9 @@ import Synchronization
 #if SubprocessSpan
 @available(SubprocessSpan, *)
 #endif
+#if ContemporaryMacOS
+@available(macOS 15, *)
+#endif
 public final class Execution<
     Output: OutputProtocol,
     Error: OutputProtocol
@@ -101,6 +104,9 @@ public final class Execution<
 #if SubprocessSpan
 @available(SubprocessSpan, *)
 #endif
+#if ContemporaryMacOS
+@available(macOS 15, *)
+#endif
 extension Execution where Output == SequenceOutput {
     /// The standard output of the subprocess.
     ///
@@ -123,6 +129,9 @@ extension Execution where Output == SequenceOutput {
 
 #if SubprocessSpan
 @available(SubprocessSpan, *)
+#endif
+#if ContemporaryMacOS
+@available(macOS 15, *)
 #endif
 extension Execution where Error == SequenceOutput {
     /// The standard error of the subprocess.
@@ -170,6 +179,9 @@ internal typealias CapturedIOs<
 
 #if SubprocessSpan
 @available(SubprocessSpan, *)
+#endif
+#if ContemporaryMacOS
+@available(macOS 15, *)
 #endif
 extension Execution {
     internal func captureIOs() async throws -> CapturedIOs<

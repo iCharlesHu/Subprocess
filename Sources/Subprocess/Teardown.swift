@@ -76,6 +76,9 @@ public struct TeardownStep: Sendable, Hashable {
 #if SubprocessSpan
 @available(SubprocessSpan, *)
 #endif
+#if ContemporaryMacOS
+@available(macOS 15, *)
+#endif
 extension Execution {
     /// Performs a sequence of teardown steps on the Subprocess.
     /// Teardown sequence always ends with a `.kill` signal
@@ -95,6 +98,9 @@ internal enum TeardownStepCompletion {
 
 #if SubprocessSpan
 @available(SubprocessSpan, *)
+#endif
+#if ContemporaryMacOS
+@available(macOS 15, *)
 #endif
 extension Execution {
     internal func gracefulShutDown(
