@@ -61,6 +61,9 @@ public struct Configuration: Sendable {
     #if SubprocessSpan
     @available(SubprocessSpan, *)
     #endif
+    #if ContemporaryMacOS
+    @available(macOS 15, *)
+    #endif
     internal func run<
         Result,
         Output: OutputProtocol,
@@ -230,6 +233,9 @@ public struct Configuration: Sendable {
     #if SubprocessSpan
     @available(SubprocessSpan, *)
     #endif
+    #if ContemporaryMacOS
+    @available(macOS 15, *)
+    #endif
     internal func run<
         Result,
         Input: InputProtocol,
@@ -344,6 +350,9 @@ extension Configuration {
     @Sendable
     #if SubprocessSpan
     @available(SubprocessSpan, *)
+    #endif
+    #if ContemporaryMacOS
+    @available(macOS 15, *)
     #endif
     private func cleanup<
         Output: OutputProtocol,
